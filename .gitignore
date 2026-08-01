@@ -1,0 +1,18 @@
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# Backend
+backend/.venv/
+backend/.env
+backend/vireqo.db
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+*.pyc
+
+# General
+.DS_Store
+.vscode/
+.idea/
