@@ -7,6 +7,7 @@ import {
   Bell,
   Bot,
   CalendarDays,
+  ClipboardList,
   ChevronDown,
   CircleUserRound,
   LayoutDashboard,
@@ -37,7 +38,9 @@ const manage = [
   { icon: CircleUserRound, label: "Team", href: "/dashboard/team" },
 ];
 
-const commandItems = [...nav, ...manage];
+const privilegedManage = [
+  { icon: ClipboardList, label: "Activity log", href: "/dashboard/activity" },
+];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -45,6 +48,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  const manageItems = useMemo(
+    () =>
+      user && (user.role === "owner" || user.role === "admin")
+        ? [...manage, ...privilegedManage]
+        : manage,
+    [user],
+  );
+
+  const commandItems = useMemo(() => [...nav, ...manageItems], [manageItems]);
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
@@ -74,7 +87,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     const clean = query.trim().toLowerCase();
     if (!clean) return commandItems;
     return commandItems.filter((item) => item.label.toLowerCase().includes(clean));
-  }, [query]);
+  }, [query, commandItems]);
 
   if (loading || !user) {
     return (
@@ -110,7 +123,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             );
           })}
           <span className="sidebar-label second">Manage</span>
-          {manage.map((item) => {
+          {manageItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
@@ -193,6 +206,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                       <div><strong>Review appointments</strong><span>Manage upcoming calls and outcomes.</span></div>
                       <ArrowUpRight size={14} />
                     </Link>
+                    {(user.role === "owner" || user.role === "admin") && (
+                      <Link href="/dashboard/activity">
+                        <ClipboardList size={17} />
+                        <div><strong>Review activity log</strong><span>Inspect recent security and CRM changes.</span></div>
+                        <ArrowUpRight size={14} />
+                      </Link>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

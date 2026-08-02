@@ -1,4 +1,5 @@
 import type {
+  AuditLog,
   Analytics,
   Appointment,
   AuthSession,
@@ -326,6 +327,10 @@ export async function getConversations(): Promise<Conversation[]> {
 
 export async function deleteConversation(id: string): Promise<void> {
   return authenticatedRequest<void>(`/conversations/${id}`, { method: "DELETE" });
+}
+
+export async function getAuditLogs(limit = 100): Promise<AuditLog[]> {
+  return authenticatedRequest<AuditLog[]>(`/audit?limit=${Math.max(1, Math.min(limit, 500))}`);
 }
 
 export async function getTeam(): Promise<TeamMember[]> {

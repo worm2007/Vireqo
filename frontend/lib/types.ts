@@ -103,3 +103,13 @@ export type ForgotPasswordResult = {
   reset_token?: string | null;
   reset_url?: string | null;
 };
+export type AuditLog = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  details: string;
+  ip_address: string;
+  created_at: string;
+};
+
