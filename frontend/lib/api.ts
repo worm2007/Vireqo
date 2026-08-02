@@ -369,14 +369,17 @@ export async function captureLead(payload: {
   });
 }
 
-export async function sendChat(payload: {
-  session_id: string;
-  message: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-}): Promise<ChatResponse> {
-  return rawRequest<ChatResponse>("/chat/vireqo-demo", {
+export async function sendChat(
+  payload: {
+    session_id: string;
+    message: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+  },
+  businessSlug = "vireqo-demo",
+): Promise<ChatResponse> {
+  return rawRequest<ChatResponse>(`/chat/${encodeURIComponent(businessSlug)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { motion } from "framer-motion";
 import {
   Bell,
+  Bot,
   CalendarDays,
   ChevronDown,
   CircleUserRound,
@@ -23,6 +24,7 @@ import { BrandMark } from "./BrandMark";
 
 const nav = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
+  { icon: Bot, label: "Chat with AI", href: "/dashboard/ai-assistant" },
   { icon: UsersRound, label: "Opportunities", href: "/dashboard/opportunities" },
   { icon: MessageSquareText, label: "Conversations", href: "/dashboard/conversations" },
   { icon: CalendarDays, label: "Appointments", href: "/dashboard/appointments" },

@@ -3,15 +3,30 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Bot, LoaderCircle, Sparkles, X } from "lucide-react";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
-import { sendChat } from "@/lib/api";
+import { getStoredUser, sendChat } from "@/lib/api";
 
 type ChatMessage = {
   role: "assistant" | "user";
   content: string;
 };
 
-export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
+type ChatWidgetProps = {
+  embedded?: boolean;
+  businessSlug?: string;
+  showIdentity?: boolean;
+  initialMessage?: string;
+};
+
+export function ChatWidget({
+  embedded = false,
+  businessSlug,
+  showIdentity = true,
+  initialMessage =
+    "Welcome to Vireqo. What kind of lead or growth problem would you like to solve?",
+}: ChatWidgetProps) {
   const sessionId = useMemo(() => `web-${crypto.randomUUID()}`, []);
+  const resolvedBusinessSlug =
+    businessSlug ?? getStoredUser()?.business.slug ?? "vireqo-demo";
 
   const [open, setOpen] = useState(embedded);
   const [launcherHovered, setLauncherHovered] = useState(false);
@@ -20,8 +35,7 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      content:
-        "Welcome to Vireqo. What kind of lead or growth problem would you like to solve?",
+      content: initialMessage,
     },
   ]);
   const [loading, setLoading] = useState(false);
@@ -55,11 +69,14 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
     setLoading(true);
 
     try {
-      const response = await sendChat({
-        session_id: sessionId,
-        message: clean,
-        ...identity,
-      });
+      const response = await sendChat(
+        {
+          session_id: sessionId,
+          message: clean,
+          ...(showIdentity ? identity : {}),
+        },
+        resolvedBusinessSlug,
+      );
 
       setMessages((current) => [
         ...current,
@@ -159,30 +176,32 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
         )}
       </header>
 
-      <div className="chat-identity">
-        <input
-          value={identity.name}
-          onChange={(event) =>
-            setIdentity({
-              ...identity,
-              name: event.target.value,
-            })
-          }
-          placeholder="Your name"
-        />
+      {showIdentity && (
+        <div className="chat-identity">
+          <input
+            value={identity.name}
+            onChange={(event) =>
+              setIdentity({
+                ...identity,
+                name: event.target.value,
+              })
+            }
+            placeholder="Your name"
+          />
 
-        <input
-          value={identity.email}
-          onChange={(event) =>
-            setIdentity({
-              ...identity,
-              email: event.target.value,
-            })
-          }
-          placeholder="Email (creates lead)"
-          type="email"
-        />
-      </div>
+          <input
+            value={identity.email}
+            onChange={(event) =>
+              setIdentity({
+                ...identity,
+                email: event.target.value,
+              })
+            }
+            placeholder="Email (creates lead)"
+            type="email"
+          />
+        </div>
+      )}
 
       <div className="chat-messages">
         {messages.map((item, index) => (
