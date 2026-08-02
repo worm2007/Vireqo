@@ -31,6 +31,7 @@ export default function AiAssistantPage() {
         >
           <ChatWidget
             embedded
+            authenticated
             showIdentity={false}
             initialMessage="I’m your Vireqo workspace assistant. Ask me about lead qualification, follow-ups, conversion strategy, appointment handling or your sales workflow."
           />

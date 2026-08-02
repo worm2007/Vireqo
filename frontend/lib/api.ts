@@ -384,3 +384,13 @@ export async function sendChat(
     body: JSON.stringify(payload),
   });
 }
+
+export async function sendWorkspaceChat(payload: {
+  session_id: string;
+  message: string;
+}): Promise<ChatResponse> {
+  return authenticatedRequest<ChatResponse>("/chat/workspace/assistant", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

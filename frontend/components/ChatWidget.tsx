@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Bot, LoaderCircle, Sparkles, X } from "lucide-react";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
-import { getStoredUser, sendChat } from "@/lib/api";
+import { getStoredUser, sendChat, sendWorkspaceChat } from "@/lib/api";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -15,6 +15,7 @@ type ChatWidgetProps = {
   businessSlug?: string;
   showIdentity?: boolean;
   initialMessage?: string;
+  authenticated?: boolean;
 };
 
 export function ChatWidget({
@@ -23,6 +24,7 @@ export function ChatWidget({
   showIdentity = true,
   initialMessage =
     "Welcome to Vireqo. What kind of lead or growth problem would you like to solve?",
+  authenticated = false,
 }: ChatWidgetProps) {
   const sessionId = useMemo(() => `web-${crypto.randomUUID()}`, []);
   const resolvedBusinessSlug =
@@ -69,30 +71,37 @@ export function ChatWidget({
     setLoading(true);
 
     try {
-      const response = await sendChat(
-        {
-          session_id: sessionId,
-          message: clean,
-          ...(showIdentity ? identity : {}),
-        },
-        resolvedBusinessSlug,
-      );
+      const response = authenticated
+        ? await sendWorkspaceChat({
+            session_id: sessionId,
+            message: clean,
+          })
+        : await sendChat(
+            {
+              session_id: sessionId,
+              message: clean,
+              ...(showIdentity ? identity : {}),
+            },
+            resolvedBusinessSlug,
+          );
 
       setMessages((current) => [
         ...current,
         { role: "assistant", content: response.reply },
       ]);
 
-      if (response.score) {
+      if (response.score !== null && response.score !== undefined) {
         setScore(response.score);
       }
-    } catch {
+    } catch (error) {
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
           content:
-            "The local API is offline. Start FastAPI on port 8000 and send that again.",
+            error instanceof Error
+              ? error.message
+              : "Vireqo could not complete that request. Please try again.",
         },
       ]);
     } finally {
@@ -210,6 +219,7 @@ export function ChatWidget({
             key={`${item.role}-${index}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
+            style={{ whiteSpace: "pre-wrap" }}
           >
             {item.content}
           </motion.div>
