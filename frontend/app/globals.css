@@ -290,3 +290,155 @@ button { cursor: pointer; }
   .trust-strip { gap: 9px 13px; }
   .micro-signal { display: none; }
 }
+/* ======================================================
+   VIREQO PREMIUM HERO BACKGROUND
+====================================================== */
+
+.hero-premium {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: calc(100vh - 84px);
+}
+
+.hero-premium > .hero-copy,
+.hero-premium > .hero-stage {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-background {
+  position: absolute;
+  inset: -100px calc(50% - 50vw);
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-background-base {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      circle at 72% 36%,
+      rgba(199, 255, 47, 0.09),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 18% 70%,
+      rgba(15, 61, 44, 0.08),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(247, 245, 242, 0.2),
+      rgba(247, 245, 242, 0.92)
+    );
+}
+
+.hero-pointer-light {
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(199, 255, 47, 0.12) 0%,
+    rgba(199, 255, 47, 0.045) 35%,
+    transparent 70%
+  );
+  filter: blur(18px);
+  opacity: 0.8;
+  will-change: left, top;
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+
+.hero-orb-lime {
+  top: 9%;
+  right: 4%;
+  width: 360px;
+  height: 360px;
+  background: rgba(199, 255, 47, 0.13);
+}
+
+.hero-orb-forest {
+  bottom: 2%;
+  left: -5%;
+  width: 420px;
+  height: 420px;
+  background: rgba(15, 61, 44, 0.1);
+}
+
+.hero-grid-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  background-image:
+    linear-gradient(rgba(16, 16, 16, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 16, 16, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 18%,
+    black 75%,
+    transparent
+  );
+}
+
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(247, 245, 242, 0.75),
+      transparent 22%,
+      transparent 78%,
+      rgba(247, 245, 242, 0.6)
+    ),
+    linear-gradient(
+      180deg,
+      transparent 60%,
+      rgba(247, 245, 242, 0.92)
+    );
+}
+
+@media (max-width: 900px) {
+  .hero-premium {
+    min-height: auto;
+  }
+
+  .hero-pointer-light {
+    display: none;
+  }
+
+  .hero-orb-lime {
+    top: 6%;
+    right: -35%;
+  }
+
+  .hero-orb-forest {
+    bottom: 5%;
+    left: -50%;
+  }
+
+  .hero-grid-overlay {
+    background-size: 48px 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-pointer-light,
+  .hero-orb {
+    transition: none !important;
+    animation: none !important;
+  }
+}
