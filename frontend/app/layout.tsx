@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./homepage-v3.css";
 
 export const metadata: Metadata = {
   title: "Vireqo — AI Lead Operating System",
