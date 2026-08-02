@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const statusOptions: Lead["status"][] = [
   "new",
@@ -67,6 +68,8 @@ function leadToForm(lead: Lead): LeadForm {
 }
 
 export default function OpportunitiesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -109,6 +112,17 @@ export default function OpportunitiesPage() {
     const timer = window.setTimeout(() => void load(), 250);
     return () => window.clearTimeout(timer);
   }, [search, status, temperature]);
+
+  useEffect(() => {
+    const requestedLeadId = searchParams.get("edit");
+    if (loading || !requestedLeadId || editingLeadId === requestedLeadId) return;
+
+    const requestedLead = leads.find((lead) => lead.id === requestedLeadId);
+    if (!requestedLead) return;
+
+    startEditing(requestedLead);
+    router.replace("/dashboard/opportunities", { scroll: false });
+  }, [editingLeadId, leads, loading, router, searchParams]);
 
   async function submitCreate(event: FormEvent) {
     event.preventDefault();

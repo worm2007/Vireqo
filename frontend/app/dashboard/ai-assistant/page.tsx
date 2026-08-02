@@ -2,7 +2,15 @@
 
 import { ChatWidget } from "@/components/ChatWidget";
 import { DashboardShell } from "@/components/DashboardShell";
+import { openVireqoChat } from "@/lib/uiEvents";
 import { Bot, ShieldCheck, Sparkles } from "lucide-react";
+
+const suggestedPrompts = [
+  "How should I qualify a new real-estate lead?",
+  "Write a follow-up for a warm prospect.",
+  "What questions should my chatbot ask?",
+  "How can I increase booked meetings?",
+];
 
 export default function AiAssistantPage() {
   return (
@@ -42,19 +50,16 @@ export default function AiAssistantPage() {
             <Sparkles size={18} />
             <div>
               <h3>What to ask</h3>
-              <p>Try a practical sales or CRM question.</p>
+              <p>Select a prompt to send it directly to Vireqo AI.</p>
             </div>
           </div>
 
           <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
-            {[
-              "How should I qualify a new real-estate lead?",
-              "Write a follow-up for a warm prospect.",
-              "What questions should my chatbot ask?",
-              "How can I increase booked meetings?",
-            ].map((prompt) => (
-              <div
+            {suggestedPrompts.map((prompt) => (
+              <button
+                type="button"
                 key={prompt}
+                onClick={() => openVireqoChat(prompt, true)}
                 style={{
                   padding: 12,
                   border: "1px solid rgba(17,17,15,.08)",
@@ -62,10 +67,13 @@ export default function AiAssistantPage() {
                   background: "rgba(255,255,255,.55)",
                   fontSize: 12,
                   lineHeight: 1.5,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  color: "inherit",
                 }}
               >
                 {prompt}
-              </div>
+              </button>
             ))}
           </div>
 

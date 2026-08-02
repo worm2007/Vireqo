@@ -2,8 +2,20 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Bot, LoaderCircle, Sparkles, X } from "lucide-react";
-import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getStoredUser, sendChat, sendWorkspaceChat } from "@/lib/api";
+import {
+  VIREQO_CHAT_EVENT,
+  type VireqoChatEventDetail,
+} from "@/lib/uiEvents";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -30,6 +42,7 @@ export function ChatWidget({
   const resolvedBusinessSlug =
     businessSlug ?? getStoredUser()?.business.slug ?? "vireqo-demo";
 
+  const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(embedded);
   const [launcherHovered, setLauncherHovered] = useState(false);
   const [message, setMessage] = useState("");
@@ -57,56 +70,91 @@ export function ChatWidget({
     };
   }, []);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  const sendMessage = useCallback(
+    async (rawMessage: string) => {
+      const clean = rawMessage.trim();
+      if (!clean || loading) return;
 
-    const clean = message.trim();
-    if (!clean || loading) return;
+      setMessages((current) => [
+        ...current,
+        { role: "user", content: clean },
+      ]);
+      setMessage("");
+      setLoading(true);
 
-    setMessages((current) => [
-      ...current,
-      { role: "user", content: clean },
-    ]);
-    setMessage("");
-    setLoading(true);
-
-    try {
-      const response = authenticated
-        ? await sendWorkspaceChat({
-            session_id: sessionId,
-            message: clean,
-          })
-        : await sendChat(
-            {
+      try {
+        const response = authenticated
+          ? await sendWorkspaceChat({
               session_id: sessionId,
               message: clean,
-              ...(showIdentity ? identity : {}),
-            },
-            resolvedBusinessSlug,
-          );
+            })
+          : await sendChat(
+              {
+                session_id: sessionId,
+                message: clean,
+                ...(showIdentity ? identity : {}),
+              },
+              resolvedBusinessSlug,
+            );
 
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", content: response.reply },
-      ]);
+        setMessages((current) => [
+          ...current,
+          { role: "assistant", content: response.reply },
+        ]);
 
-      if (response.score !== null && response.score !== undefined) {
-        setScore(response.score);
+        if (response.score !== null && response.score !== undefined) {
+          setScore(response.score);
+        }
+      } catch (error) {
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content:
+              error instanceof Error
+                ? error.message
+                : "Vireqo could not complete that request. Please try again.",
+          },
+        ]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content:
-            error instanceof Error
-              ? error.message
-              : "Vireqo could not complete that request. Please try again.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    },
+    [
+      authenticated,
+      identity,
+      loading,
+      resolvedBusinessSlug,
+      sessionId,
+      showIdentity,
+    ],
+  );
+
+  useEffect(() => {
+    const handleChatRequest = (event: Event) => {
+      const detail = (event as CustomEvent<VireqoChatEventDetail>).detail ?? {};
+
+      if (!embedded) {
+        setOpen(true);
+      }
+
+      if (detail.message) {
+        setMessage(detail.message);
+        if (detail.submit) {
+          void sendMessage(detail.message);
+        }
+      }
+
+      window.setTimeout(() => inputRef.current?.focus(), 80);
+    };
+
+    window.addEventListener(VIREQO_CHAT_EVENT, handleChatRequest);
+    return () => window.removeEventListener(VIREQO_CHAT_EVENT, handleChatRequest);
+  }, [embedded, sendMessage]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    void sendMessage(message);
   }
 
   const panelPosition: CSSProperties = embedded
@@ -147,20 +195,9 @@ export function ChatWidget({
               scale: 0.98,
             }
       }
-      animate={{
-        opacity: 1,
-        x: 0,
-        scale: 1,
-      }}
-      exit={{
-        opacity: 0,
-        x: -22,
-        scale: 0.98,
-      }}
-      transition={{
-        duration: 0.25,
-        ease: [0.22, 1, 0.36, 1],
-      }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: -22, scale: 0.98 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
     >
       <header className="chat-header">
         <div className="chat-avatar">
@@ -190,10 +227,7 @@ export function ChatWidget({
           <input
             value={identity.name}
             onChange={(event) =>
-              setIdentity({
-                ...identity,
-                name: event.target.value,
-              })
+              setIdentity({ ...identity, name: event.target.value })
             }
             placeholder="Your name"
           />
@@ -201,10 +235,7 @@ export function ChatWidget({
           <input
             value={identity.email}
             onChange={(event) =>
-              setIdentity({
-                ...identity,
-                email: event.target.value,
-              })
+              setIdentity({ ...identity, email: event.target.value })
             }
             placeholder="Email (creates lead)"
             type="email"
@@ -242,13 +273,14 @@ export function ChatWidget({
 
       <form className="chat-input" onSubmit={submit}>
         <input
+          ref={inputRef}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Ask about pricing, setup or a demo…"
         />
 
-        <button type="submit" aria-label="Send message">
-          <ArrowUp size={17} />
+        <button type="submit" aria-label="Send message" disabled={loading}>
+          {loading ? <LoaderCircle className="spin" size={17} /> : <ArrowUp size={17} />}
         </button>
       </form>
     </motion.section>
@@ -277,10 +309,7 @@ export function ChatWidget({
           }}
           whileTap={{ scale: 0.97 }}
           transition={{
-            width: {
-              duration: 0.25,
-              ease: [0.22, 1, 0.36, 1],
-            },
+            width: { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
             opacity: { duration: 0.2 },
             x: { duration: 0.2 },
           }}

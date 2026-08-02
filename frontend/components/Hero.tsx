@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { openVireqoChat } from "@/lib/uiEvents";
 import { useEffect, useMemo, useState, type PointerEvent } from "react";
 
 const events = [
@@ -176,9 +177,13 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.24 }}
         >
-          <Link href="/demo" className="v3-button primary v3-magnetic-button">
+          <button
+            type="button"
+            className="v3-button primary v3-magnetic-button"
+            onClick={() => openVireqoChat()}
+          >
             <span>Try live AI</span><ArrowUpRight size={18} />
-          </Link>
+          </button>
           <Link href="/demo" className="v3-button secondary v3-magnetic-button">Book a demo</Link>
         </motion.div>
 
