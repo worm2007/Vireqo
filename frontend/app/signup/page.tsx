@@ -30,7 +30,7 @@ export default function SignupPage() {
     }
     try {
       await register(form);
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create workspace");
       setLoading(false);

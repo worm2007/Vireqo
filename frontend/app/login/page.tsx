@@ -23,7 +23,7 @@ export default function LoginPage() {
     setError("");
     try {
       await login(form.email, form.password);
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
       setLoading(false);
@@ -35,7 +35,7 @@ export default function LoginPage() {
     setError("");
     try {
       await demoLogin();
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Demo API unavailable");
       setLoading(false);
