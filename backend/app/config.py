@@ -17,7 +17,15 @@ class Settings:
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "1440"))
+    access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "30"))
+    refresh_token_days: int = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
+    password_reset_minutes: int = int(os.getenv("PASSWORD_RESET_MINUTES", "30"))
+    resend_api_key: str = os.getenv("RESEND_API_KEY", "")
+    email_from: str = os.getenv("EMAIL_FROM", "Vireqo <onboarding@resend.dev>")
+
+    @property
+    def is_development(self) -> bool:
+        return self.environment.lower() in {"development", "dev", "local", "test"}
 
 
 settings = Settings()

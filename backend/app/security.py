@@ -4,6 +4,8 @@ import base64
 import hashlib
 import hmac
 import os
+import secrets
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -42,10 +44,20 @@ def create_access_token(user_id: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
+        "typ": "access",
+        "jti": secrets.token_hex(12),
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_minutes),
     }
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def generate_opaque_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_opaque_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def get_current_user(
@@ -57,12 +69,25 @@ def get_current_user(
     try:
         payload = jwt.decode(credentials.credentials, settings.secret_key, algorithms=["HS256"])
         user_id = payload.get("sub")
-        if not user_id:
-            raise ValueError("Missing subject")
+        if not user_id or payload.get("typ") != "access":
+            raise ValueError("Invalid token payload")
     except (jwt.PyJWTError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token") from exc
 
-    user = db.scalar(select(User).options(selectinload(User.business)).where(User.id == user_id, User.is_active.is_(True)))
+    user = db.scalar(
+        select(User)
+        .options(selectinload(User.business))
+        .where(User.id == user_id, User.is_active.is_(True))
+    )
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
     return user
+
+
+def require_roles(*roles: str) -> Callable[..., User]:
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return current_user
+
+    return dependency

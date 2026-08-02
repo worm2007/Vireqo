@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import Base, SessionLocal, engine
-from .routers import analytics, appointments, auth, businesses, chatbot, leads
+from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, team
 from .seed import seed_demo_data
 
 
@@ -21,8 +21,8 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
-    description="Lead capture, qualification, CRM and appointment APIs for Vireqo.",
+    version="0.2.0",
+    description="Authentication, CRM, conversations, appointments and analytics APIs for Vireqo.",
     lifespan=lifespan,
 )
 
@@ -32,21 +32,25 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(businesses.router, prefix="/api/v1")
+app.include_router(team.router, prefix="/api/v1")
 app.include_router(leads.router, prefix="/api/v1")
 app.include_router(chatbot.router, prefix="/api/v1")
+app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"name": "Vireqo API", "status": "online", "docs": "/docs"}
+    return {"name": "Vireqo API", "status": "online", "version": "0.2.0", "docs": "/docs"}
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "healthy", "environment": settings.environment}
+    return {"status": "healthy", "environment": settings.environment, "version": "0.2.0"}

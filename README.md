@@ -1,78 +1,85 @@
-# Vireqo Full-Stack MVP
+# Vireqo Full-Stack Backend Edition
 
-Vireqo is a premium AI lead operating system starter. This repository includes a polished animated website, functional authentication, a live lead-capture demo, an AI concierge with a no-key fallback, a CRM dashboard, lead scoring, appointments and analytics.
+Vireqo is a premium AI lead operating system. This release keeps the approved animated website and adds a complete functional backend foundation for authentication, multi-tenant CRM data, conversations, appointments, business settings and team access.
 
-## Included now
+## What works now
 
-- Premium responsive landing page and design system
-- Functional signup, login and demo login
-- FastAPI + SQLAlchemy backend
-- SQLite by default; PostgreSQL-ready through `DATABASE_URL`
-- Real lead capture and persistent CRM records
-- AI concierge conversation storage
-- Optional Groq integration with safe local fallback
-- Intent scoring: hot, warm and cold
-- Protected leads and analytics endpoints
-- Appointment API
-- Connected dashboard with status updates
-- Seeded demo account and data
-- API tests
+### Authentication and account security
 
-## Project structure
+- Owner registration creates a new business workspace
+- Login with secure PBKDF2 password hashing
+- Short-lived JWT access tokens
+- Opaque refresh tokens stored as hashes and rotated on refresh
+- Logout revokes the refresh token
+- Protected `/auth/me` session endpoint
+- Change password with automatic session revocation
+- Forgot-password and one-use reset-token workflow
+- Optional Resend email delivery
+- Local development reset link when no email provider is configured
+- Demo workspace login
 
-```text
-vireqo-fullstack/
-├── frontend/          Next.js + TypeScript + Framer Motion
-├── backend/           FastAPI + SQLAlchemy
-├── docker-compose.yml Optional local PostgreSQL
-└── README.md
-```
+### Workspace and team
 
-## 1. Start the backend
+- Multi-tenant business separation
+- Read and update business profile
+- Custom business description, website, brand colour and AI greeting
+- Owner/admin/member roles
+- Add team members
+- Change member roles
+- Activate or deactivate member access
+- Owner and self-deactivation safeguards
 
-Open Terminal 1:
+### CRM and operations
+
+- Public website lead capture
+- Lead deduplication by business and email
+- Protected lead creation, listing, search and filters
+- Lead detail, full editing, scoring, status changes and deletion
+- AI chatbot conversation persistence
+- Protected conversation history and deletion
+- Public appointment booking
+- Appointment conflict and past-time validation
+- Appointment listing, status updates and deletion
+- Business analytics
+- Audit trail for important account and CRM changes
+
+### Frontend connections
+
+- Functional signup and login pages
+- Forgot-password and reset-password pages
+- Automatic access-token refresh
+- Protected dashboard with sign-out
+- Real user and workspace identity in the dashboard
+- Opportunities management page
+- Conversations page
+- Appointments page
+- Business and password settings page
+- Team management page
+- Existing premium homepage, motion and slim left chatbot preserved
+
+## Start the backend
 
 ```bash
 cd backend
-python -m venv .venv
-```
-
-macOS/Linux:
-
-```bash
+python3 -m venv .venv
 source .venv/bin/activate
-```
-
-Windows PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Install and start:
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env  # Windows: copy .env.example .env
-uvicorn app.main:app --reload --port 8000
+python -m pip install -r requirements.txt
+cp .env.example .env
+python -m uvicorn app.main:app --reload --reload-dir app
 ```
 
 Backend URLs:
 
-- API: `http://localhost:8000`
-- Interactive docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
+- API: `http://127.0.0.1:8000`
+- Swagger: `http://127.0.0.1:8000/docs`
+- Health: `http://127.0.0.1:8000/health`
 
-The default database is SQLite, so PostgreSQL is not required for the first run.
-
-## 2. Start the frontend
-
-Open Terminal 2:
+## Start the frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # Windows: copy .env.example .env.local
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -83,68 +90,44 @@ Open `http://localhost:3000`.
 - Email: `demo@vireqo.local`
 - Password: `VireqoDemo123!`
 
-You can also press **Enter the live demo workspace** on the login screen.
-
-## Test the real workflow
-
-1. Start both servers.
-2. Open the homepage.
-3. Submit the “Enter the system” lead form.
-4. Open `/dashboard`.
-5. The submitted lead will appear in the opportunity stream.
-6. Open `/demo`, add a name/email and chat.
-7. That conversation creates or updates a lead and its intent score.
-
-## Optional Groq AI
-
-The chatbot works without any AI key using a deterministic qualification fallback. To enable Groq, set these values before starting FastAPI:
-
-```env
-GROQ_API_KEY=your_key_here
-GROQ_MODEL=llama-3.1-8b-instant
-```
-
-Never commit a real key.
-
-## PostgreSQL mode
-
-Start PostgreSQL:
-
-```bash
-docker compose up -d database
-```
-
-Set the backend environment:
-
-```env
-DATABASE_URL=postgresql+psycopg://vireqo:vireqo_dev_password@localhost:5432/vireqo
-```
-
-Restart FastAPI.
-
-## Run backend tests
+## Test the backend
 
 ```bash
 cd backend
 pytest -q
 ```
 
-## Important production work still required
+The test suite covers the existing demo workflow plus registration, duplicate-account protection, login, access-token authentication, refresh-token rotation, business updates, team access, lead CRUD, search, appointments, audit logs, password reset and logout revocation.
 
-This is a strong functional MVP foundation, not the final commercial release. Before charging customers, add:
+## Password reset in development
 
-- Alembic database migrations
-- Email verification and password reset
-- Rate limiting and bot protection
-- Business-specific knowledge ingestion
-- Calendar provider integration
-- Resend email notifications
-- Stripe or Razorpay subscriptions
-- Role-based team permissions
-- Audit logs and production observability
-- Privacy, terms and data-retention controls
-- Deployment secrets and stricter CORS
+With `ENVIRONMENT=development` and no `RESEND_API_KEY`, the forgot-password page displays a local one-time reset link. This makes the complete flow testable without an email provider.
 
-## Working brand
+For real emails, set:
 
-`Vireqo` is the working product name. Keep brand strings centralized when adding new modules until domain and trademark clearance is complete.
+```env
+RESEND_API_KEY=your_resend_key
+EMAIL_FROM=Vireqo <your-verified-sender@example.com>
+```
+
+## Database
+
+SQLite works immediately:
+
+```env
+DATABASE_URL=sqlite:///./vireqo.db
+```
+
+PostgreSQL is supported:
+
+```bash
+docker compose up -d database
+```
+
+```env
+DATABASE_URL=postgresql+psycopg://vireqo:vireqo_dev_password@localhost:5432/vireqo
+```
+
+## Security notes before public production
+
+This is a strong functional SaaS backend, but a public commercial launch should additionally use managed PostgreSQL, database migrations, HTTPS-only deployment, stricter production CORS, distributed rate limiting, monitored email delivery, backups, error monitoring and formal privacy/data-retention controls. Payments and third-party calendar integrations are separate external-service milestones.
