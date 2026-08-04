@@ -207,6 +207,9 @@ class ChatResponse(BaseModel):
     lead_id: str | None = None
     score: int | None = None
     temperature: str | None = None
+    action_type: str | None = None
+    action_label: str | None = None
+    action_entity_id: str | None = None
 
 
 class MessagePublic(BaseModel):

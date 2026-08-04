@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -11,6 +11,7 @@ from ..models import Business, Conversation, Lead, Message, User
 from ..schemas import ChatRequest, ChatResponse
 from ..security import get_current_user
 from ..services.ai import generate_reply
+from ..services.ai_actions import try_workspace_action
 from ..services.lead_scoring import calculate_lead_score
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
@@ -45,6 +46,7 @@ def get_or_create_conversation(
 @router.post("/workspace/assistant", response_model=ChatResponse)
 async def workspace_assistant(
     payload: ChatRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
@@ -68,22 +70,35 @@ async def workspace_assistant(
     )
     db.flush()
 
-    reply = await generate_reply(
-        business=business,
-        history=history,
-        user_message=payload.message,
-        mode="workspace",
+    action = try_workspace_action(
+        db=db,
+        user=current_user,
+        message=payload.message,
+        request=request,
     )
+    if action.handled:
+        reply = action.reply
+    else:
+        reply = await generate_reply(
+            business=business,
+            history=history,
+            user_message=payload.message,
+            mode="workspace",
+        )
+
     db.add(Message(conversation_id=conversation.id, role="assistant", content=reply))
     db.commit()
 
     return ChatResponse(
         session_id=payload.session_id,
         reply=reply,
-        lead_created=False,
-        lead_id=None,
+        lead_created=action.action_type == "lead.created",
+        lead_id=action.entity_id if action.action_type and action.action_type.startswith("lead.") else None,
         score=None,
         temperature=None,
+        action_type=action.action_type,
+        action_label=action.action_label,
+        action_entity_id=action.entity_id,
     )
 
 

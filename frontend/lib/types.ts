@@ -96,6 +96,9 @@ export type ChatResponse = {
   lead_id?: string | null;
   score?: number | null;
   temperature?: string | null;
+  action_type?: string | null;
+  action_label?: string | null;
+  action_entity_id?: string | null;
 };
 
 export type ForgotPasswordResult = {

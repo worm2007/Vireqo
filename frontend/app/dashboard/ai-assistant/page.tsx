@@ -6,10 +6,10 @@ import { openVireqoChat } from "@/lib/uiEvents";
 import { Bot, ShieldCheck, Sparkles } from "lucide-react";
 
 const suggestedPrompts = [
-  "How should I qualify a new real-estate lead?",
-  "Write a follow-up for a warm prospect.",
-  "What questions should my chatbot ask?",
-  "How can I increase booked meetings?",
+  "Show my hot leads",
+  "Summarize my pipeline",
+  "Create a lead for Maya Singh, email maya@example.com, company Northstar Realty",
+  "Schedule a meeting with Maya Singh tomorrow at 3 PM",
 ];
 
 export default function AiAssistantPage() {
@@ -21,7 +21,7 @@ export default function AiAssistantPage() {
             <i /> Workspace intelligence
           </span>
           <h1>Chat with AI</h1>
-          <p>Use your business-aware Vireqo assistant without leaving the dashboard.</p>
+          <p>Ask for advice or tell Vireqo to search, create and update CRM records.</p>
         </div>
       </div>
 

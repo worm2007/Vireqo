@@ -55,6 +55,7 @@ export function ChatWidget({
   ]);
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState<number | null>(null);
+  const [lastAction, setLastAction] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function ChatWidget({
         if (response.score !== null && response.score !== undefined) {
           setScore(response.score);
         }
+        setLastAction(response.action_label ?? null);
       } catch (error) {
         setMessages((current) => [
           ...current,
@@ -263,6 +265,13 @@ export function ChatWidget({
           </div>
         )}
       </div>
+
+      {lastAction && (
+        <div className="chat-score" style={{ justifyContent: "flex-start", gap: 8 }}>
+          <Sparkles size={14} />
+          <span><strong>Action completed</strong> · {lastAction}</span>
+        </div>
+      )}
 
       {score !== null && (
         <div className="chat-score">
