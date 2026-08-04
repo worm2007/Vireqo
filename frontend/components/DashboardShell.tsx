@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useWorkspaceRealtime, type WorkspaceRealtimeEvent } from "@/hooks/useWorkspaceRealtime";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
@@ -48,6 +49,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [liveEvents, setLiveEvents] = useState<WorkspaceRealtimeEvent[]>([]);
+
+  const realtimeStatus = useWorkspaceRealtime((event) => {
+    setLiveEvents((current) => [event, ...current].slice(0, 6));
+  });
 
   const manageItems = useMemo(
     () =>
@@ -170,6 +176,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <kbd>⌘ K</kbd>
             </button>
 
+            <span className={`realtime-status ${realtimeStatus}`} title={`Workspace connection: ${realtimeStatus}`}>
+              <i />
+              {realtimeStatus === "live" ? "Live" : realtimeStatus === "connecting" ? "Connecting" : "Reconnecting"}
+            </span>
+
             <div className="notification-anchor">
               <button
                 className="icon-button"
@@ -193,9 +204,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                     exit={{ opacity: 0, y: -8, scale: 0.98 }}
                   >
                     <div className="notification-popover-head">
-                      <div><strong>Workspace activity</strong><span>Quick access to items that need review.</span></div>
+                      <div><strong>Workspace activity</strong><span>{realtimeStatus === "live" ? "Updating live across every signed-in tab." : "Reconnecting to live updates."}</span></div>
                       <button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><X size={15} /></button>
                     </div>
+                    {liveEvents.length > 0 && (
+                      <div className="live-event-list">
+                        {liveEvents.slice(0, 3).map((event) => (
+                          <div className="live-event-item" key={event.id ?? `${event.type}-${event.occurred_at}`}>
+                            <span><i /></span>
+                            <div>
+                              <strong>{formatLiveEvent(event)}</strong>
+                              <small>Just now</small>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <Link href="/dashboard/conversations">
                       <MessageSquareText size={17} />
                       <div><strong>Review conversations</strong><span>Check the latest visitor exchanges.</span></div>
@@ -279,4 +303,17 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </AnimatePresence>
     </div>
   );
+}
+
+
+function formatLiveEvent(event: WorkspaceRealtimeEvent): string {
+  const name = typeof event.payload.name === "string" ? event.payload.name : "Workspace";
+  if (event.type === "lead.created") return `${name} added as an opportunity`;
+  if (event.type === "lead.updated") return `${name} opportunity updated`;
+  if (event.type === "lead.deleted") return `${name} opportunity removed`;
+  if (event.type === "appointment.created") return `Appointment booked for ${name}`;
+  if (event.type === "appointment.updated") return `Appointment updated for ${name}`;
+  if (event.type === "appointment.deleted") return `Appointment removed for ${name}`;
+  if (event.type.startsWith("conversation.")) return "Conversation activity received";
+  return typeof event.payload.label === "string" ? event.payload.label : "Workspace updated";
 }

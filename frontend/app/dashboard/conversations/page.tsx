@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import { deleteConversation, getConversations } from "@/lib/api";
 import type { Conversation } from "@/lib/types";
 import { AnimatePresence, motion } from "framer-motion";
@@ -27,14 +28,28 @@ export default function ConversationsPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Conversation | null>(null);
 
+  async function loadConversations(silent = false) {
+    if (!silent) setLoading(true);
+    try {
+      const conversations = await getConversations();
+      setItems(conversations);
+      setSelected((current) =>
+        current ? conversations.find((item) => item.id === current.id) ?? null : null,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load conversations");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    getConversations()
-      .then(setItems)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Unable to load conversations"),
-      )
-      .finally(() => setLoading(false));
+    void loadConversations();
   }, []);
+
+  useWorkspaceEvent(() => {
+    void loadConversations(true);
+  }, ["conversation."]);
 
   useEffect(() => {
     if (!selected) return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createAppointment,
   deleteAppointment,
@@ -87,17 +88,26 @@ export default function AppointmentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<AppointmentForm | null>(null);
 
+  async function loadAppointments(silent = false) {
+    if (!silent) setLoading(true);
+    try {
+      const [appointments, user] = await Promise.all([getAppointments(), getCurrentUser()]);
+      setItems(appointments);
+      setBusinessSlug(user.business.slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load appointments");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    Promise.all([getAppointments(), getCurrentUser()])
-      .then(([appointments, user]) => {
-        setItems(appointments);
-        setBusinessSlug(user.business.slug);
-      })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Unable to load appointments"),
-      )
-      .finally(() => setLoading(false));
+    void loadAppointments();
   }, []);
+
+  useWorkspaceEvent(() => {
+    void loadAppointments(true);
+  }, ["appointment."]);
 
   const filteredItems = useMemo(() => {
     const clean = query.trim().toLowerCase();

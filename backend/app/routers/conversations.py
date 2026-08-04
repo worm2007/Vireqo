@@ -9,6 +9,7 @@ from ..models import Conversation, User
 from ..schemas import ConversationPublic
 from ..security import get_current_user
 from ..services.audit import record_audit
+from ..services.realtime import workspace_events
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
@@ -72,5 +73,8 @@ def delete_conversation(
         entity_id=conversation.id,
         request=request,
     )
+    business_id = conversation.business_id
+    payload = {"id": conversation.id}
     db.delete(conversation)
     db.commit()
+    workspace_events.publish(business_id, "conversation.deleted", payload)

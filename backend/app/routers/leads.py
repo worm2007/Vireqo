@@ -10,6 +10,7 @@ from ..schemas import LeadCreate, LeadPublic, LeadUpdate
 from ..security import get_current_user
 from ..services.audit import record_audit
 from ..services.lead_scoring import calculate_lead_score
+from ..services.realtime import workspace_events
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 
@@ -83,6 +84,7 @@ def create_lead(
     )
     db.commit()
     db.refresh(lead)
+    workspace_events.publish(lead.business_id, "lead.created", {"id": lead.id, "name": lead.name, "status": lead.status, "score": lead.score})
     return lead
 
 
@@ -175,6 +177,7 @@ def update_lead(
     )
     db.commit()
     db.refresh(lead)
+    workspace_events.publish(lead.business_id, "lead.updated", {"id": lead.id, "name": lead.name, "status": lead.status, "score": lead.score})
     return lead
 
 
@@ -199,5 +202,8 @@ def delete_lead(
         details={"name": lead.name},
         request=request,
     )
+    business_id = lead.business_id
+    payload = {"id": lead.id, "name": lead.name}
     db.delete(lead)
     db.commit()
+    workspace_events.publish(business_id, "lead.deleted", payload)

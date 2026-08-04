@@ -2290,3 +2290,102 @@ button { cursor: pointer; }
   .executive-metric-grid { grid-template-columns: 1fr 1fr; }
   .executive-action-link em { display: none; }
 }
+
+/* Sprint 2.2 — Live workspace */
+.realtime-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(18, 66, 49, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #59645f;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.realtime-status > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d09c38;
+  box-shadow: 0 0 0 4px rgba(208, 156, 56, 0.12);
+}
+
+.realtime-status.live {
+  color: #174d3b;
+}
+
+.realtime-status.live > i {
+  background: #91c82c;
+  box-shadow: 0 0 0 4px rgba(145, 200, 44, 0.14);
+  animation: realtimePulse 2s ease-in-out infinite;
+}
+
+.realtime-status.reconnecting > i,
+.realtime-status.offline > i {
+  background: #e16969;
+  box-shadow: 0 0 0 4px rgba(225, 105, 105, 0.12);
+}
+
+.live-event-list {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px 5px;
+  border-bottom: 1px solid rgba(18, 66, 49, 0.08);
+}
+
+.live-event-item {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f3f7ef;
+}
+
+.live-event-item > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: #113f31;
+}
+
+.live-event-item > span i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c7ff42;
+}
+
+.live-event-item strong,
+.live-event-item small {
+  display: block;
+}
+
+.live-event-item strong {
+  color: #15201b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.live-event-item small {
+  margin-top: 2px;
+  color: #7c8781;
+  font-size: 9px;
+}
+
+@keyframes realtimePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: .72; }
+}
+
+@media (max-width: 760px) {
+  .realtime-status { display: none; }
+}

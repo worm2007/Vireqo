@@ -147,6 +147,16 @@ export type ChatResponse = {
   lead_id?: string | null;
   score?: number | null;
   temperature?: string | null;
+  action_type?: string | null;
+  action_label?: string | null;
+  action_entity_id?: string | null;
+  memory_label?: string | null;
+};
+
+export type ChatHistory = {
+  session_id: string;
+  messages: Array<{ role: "assistant" | "user"; content: string }>;
+  memory_label?: string | null;
 };
 
 export type ForgotPasswordResult = {

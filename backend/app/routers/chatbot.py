@@ -13,6 +13,7 @@ from ..security import get_current_user
 from ..services.ai import generate_reply
 from ..services.ai_actions import try_workspace_action
 from ..services.lead_scoring import calculate_lead_score
+from ..services.realtime import workspace_events
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
@@ -102,6 +103,9 @@ async def workspace_assistant(
 
     db.add(Message(conversation_id=conversation.id, role="assistant", content=reply))
     db.commit()
+    workspace_events.publish(business.id, "conversation.updated", {"id": conversation.id, "lead_id": conversation.lead_id})
+    if action.action_type:
+        workspace_events.publish(business.id, action.action_type, {"id": action.entity_id, "label": action.action_label})
 
     return ChatResponse(
         session_id=payload.session_id,
@@ -222,6 +226,9 @@ async def chat(
         lead.temperature = result.temperature
 
     db.commit()
+    workspace_events.publish(business.id, "conversation.updated", {"id": conversation.id, "lead_id": lead.id if lead else None})
+    if lead:
+        workspace_events.publish(business.id, "lead.created" if lead_created else "lead.updated", {"id": lead.id, "name": lead.name, "status": lead.status, "score": lead.score})
     return ChatResponse(
         session_id=payload.session_id,
         reply=reply,

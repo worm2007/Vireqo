@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import { LeadTable } from "@/components/LeadTable";
 import {
   clearSession,
@@ -75,6 +76,10 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useWorkspaceEvent(() => {
+    void load();
+  }, ["lead.", "appointment.", "conversation."]);
 
   async function changeStatus(lead: Lead, status: Lead["status"]) {
     const previous = lead.status;

@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
   deleteLead,
@@ -86,8 +87,8 @@ export default function OpportunitiesPage() {
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<LeadForm | null>(null);
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     setError("");
 
     try {
@@ -104,7 +105,7 @@ export default function OpportunitiesPage() {
         err instanceof Error ? err.message : "Unable to load opportunities",
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -112,6 +113,10 @@ export default function OpportunitiesPage() {
     const timer = window.setTimeout(() => void load(), 250);
     return () => window.clearTimeout(timer);
   }, [search, status, temperature]);
+
+  useWorkspaceEvent(() => {
+    void load(true);
+  }, ["lead."]);
 
   useEffect(() => {
     const requestedLeadId = searchParams.get("edit");

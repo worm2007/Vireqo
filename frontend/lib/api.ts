@@ -4,6 +4,7 @@ import type {
   Appointment,
   AuthSession,
   Business,
+  ChatHistory,
   ChatResponse,
   Conversation,
   ExecutiveInsights,
@@ -403,4 +404,20 @@ export async function sendWorkspaceChat(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getWorkspaceChatHistory(sessionId: string): Promise<ChatHistory> {
+  return authenticatedRequest<ChatHistory>(
+    `/chat/workspace/history/${encodeURIComponent(sessionId)}`,
+  );
+}
+
+export function getAccessToken(): string | null {
+  return browserStorage()?.getItem(ACCESS_KEY) ?? null;
+}
+
+export function getRealtimeUrl(): string {
+  const url = new URL(API_URL);
+  const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${url.host}${url.pathname}/realtime/ws`;
 }

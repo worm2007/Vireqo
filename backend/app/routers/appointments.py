@@ -11,6 +11,7 @@ from ..models import Appointment, Business, Lead, User, utcnow
 from ..schemas import AppointmentCreate, AppointmentPublic, AppointmentUpdate
 from ..security import get_current_user
 from ..services.audit import record_audit
+from ..services.realtime import workspace_events
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -62,6 +63,7 @@ def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)
         lead.status = "qualified"
     db.commit()
     db.refresh(appointment)
+    workspace_events.publish(appointment.business_id, "appointment.created", {"id": appointment.id, "name": appointment.name, "starts_at": appointment.starts_at.isoformat(), "status": appointment.status})
     return appointment
 
 
@@ -131,6 +133,7 @@ def update_appointment(
     )
     db.commit()
     db.refresh(appointment)
+    workspace_events.publish(appointment.business_id, "appointment.updated", {"id": appointment.id, "name": appointment.name, "starts_at": appointment.starts_at.isoformat(), "status": appointment.status})
     return appointment
 
 
@@ -158,5 +161,8 @@ def delete_appointment(
         details={"name": appointment.name},
         request=request,
     )
+    business_id = appointment.business_id
+    payload = {"id": appointment.id, "name": appointment.name}
     db.delete(appointment)
     db.commit()
+    workspace_events.publish(business_id, "appointment.deleted", payload)
