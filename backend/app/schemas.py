@@ -210,6 +210,18 @@ class ChatResponse(BaseModel):
     action_type: str | None = None
     action_label: str | None = None
     action_entity_id: str | None = None
+    memory_label: str | None = None
+
+
+class ChatHistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: list[ChatHistoryMessage] = []
+    memory_label: str | None = None
 
 
 class MessagePublic(BaseModel):

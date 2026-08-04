@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Business, Conversation, Lead, Message, User
-from ..schemas import ChatRequest, ChatResponse
+from ..schemas import ChatHistoryResponse, ChatRequest, ChatResponse
 from ..security import get_current_user
 from ..services.ai import generate_reply
 from ..services.ai_actions import try_workspace_action
@@ -74,17 +74,31 @@ async def workspace_assistant(
         db=db,
         user=current_user,
         message=payload.message,
+        active_lead=conversation.lead,
         request=request,
     )
     if action.handled:
         reply = action.reply
     else:
+        memory_context = ""
+        if conversation.lead:
+            memory_context = (
+                f"Active lead: {conversation.lead.name}. "
+                f"Company: {conversation.lead.company or 'Not provided'}. "
+                f"Email: {conversation.lead.email or 'Not provided'}. "
+                f"Status: {conversation.lead.status}. "
+                "Resolve pronouns such as him, her, them, that lead, and the same person to this lead."
+            )
         reply = await generate_reply(
             business=business,
             history=history,
             user_message=payload.message,
             mode="workspace",
+            memory_context=memory_context,
         )
+
+    if action.memory_lead_id:
+        conversation.lead_id = action.memory_lead_id
 
     db.add(Message(conversation_id=conversation.id, role="assistant", content=reply))
     db.commit()
@@ -99,6 +113,34 @@ async def workspace_assistant(
         action_type=action.action_type,
         action_label=action.action_label,
         action_entity_id=action.entity_id,
+        memory_label=action.memory_label or (conversation.lead.name if conversation.lead else None),
+    )
+
+
+@router.get("/workspace/history/{session_id}", response_model=ChatHistoryResponse)
+def workspace_history(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ChatHistoryResponse:
+    conversation = db.scalar(
+        select(Conversation)
+        .options(selectinload(Conversation.messages), selectinload(Conversation.lead))
+        .where(
+            Conversation.session_id == session_id,
+            Conversation.business_id == current_user.business_id,
+        )
+    )
+    if not conversation:
+        return ChatHistoryResponse(session_id=session_id, messages=[], memory_label=None)
+    return ChatHistoryResponse(
+        session_id=session_id,
+        messages=[
+            {"role": item.role, "content": item.content}
+            for item in conversation.messages[-40:]
+            if item.role in {"user", "assistant"}
+        ],
+        memory_label=conversation.lead.name if conversation.lead else None,
     )
 
 

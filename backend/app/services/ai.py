@@ -79,6 +79,7 @@ async def generate_reply(
     history: list[Message],
     user_message: str,
     mode: AiMode = "concierge",
+    memory_context: str = "",
 ) -> str:
     if not settings.groq_api_key:
         return fallback_reply(user_message, mode=mode)
@@ -89,6 +90,9 @@ async def generate_reply(
         industry=business.industry or "Not specified",
         description=business.description or "No additional description is available.",
     )
+
+    if memory_context.strip():
+        system_prompt += "\n\nCurrent workspace memory\n" + memory_context.strip()
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(

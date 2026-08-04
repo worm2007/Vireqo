@@ -5,6 +5,7 @@ import type {
   AuthSession,
   Business,
   ChatResponse,
+  ChatHistory,
   Conversation,
   ForgotPasswordResult,
   Lead,
@@ -398,4 +399,10 @@ export async function sendWorkspaceChat(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getWorkspaceChatHistory(sessionId: string): Promise<ChatHistory> {
+  return authenticatedRequest<ChatHistory>(
+    `/chat/workspace/history/${encodeURIComponent(sessionId)}`,
+  );
 }

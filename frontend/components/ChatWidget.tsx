@@ -7,11 +7,15 @@ import {
   FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import { getStoredUser, sendChat, sendWorkspaceChat } from "@/lib/api";
+import {
+  getStoredUser,
+  getWorkspaceChatHistory,
+  sendChat,
+  sendWorkspaceChat,
+} from "@/lib/api";
 import {
   VIREQO_CHAT_EVENT,
   type VireqoChatEventDetail,
@@ -38,7 +42,19 @@ export function ChatWidget({
     "Welcome to Vireqo. What kind of lead or growth problem would you like to solve?",
   authenticated = false,
 }: ChatWidgetProps) {
-  const sessionId = useMemo(() => `web-${crypto.randomUUID()}`, []);
+  const [sessionId] = useState(() => {
+    const fallback = `${authenticated ? "workspace" : "web"}-${crypto.randomUUID()}`;
+    if (typeof window === "undefined") return fallback;
+
+    const key = authenticated
+      ? "vireqo-workspace-ai-session"
+      : "vireqo-public-chat-session";
+    const stored = window.localStorage.getItem(key);
+    if (stored) return stored;
+
+    window.localStorage.setItem(key, fallback);
+    return fallback;
+  });
   const resolvedBusinessSlug =
     businessSlug ?? getStoredUser()?.business.slug ?? "vireqo-demo";
 
@@ -56,7 +72,34 @@ export function ChatWidget({
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [memoryLabel, setMemoryLabel] = useState<string | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(!authenticated);
   const [isMobile, setIsMobile] = useState(false);
+
+
+  useEffect(() => {
+    if (!authenticated) return;
+
+    let cancelled = false;
+    void getWorkspaceChatHistory(sessionId)
+      .then((history) => {
+        if (cancelled) return;
+        if (history.messages.length > 0) {
+          setMessages(history.messages);
+        }
+        setMemoryLabel(history.memory_label ?? null);
+      })
+      .catch(() => {
+        // A missing history is a normal first-session state.
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, sessionId]);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -107,6 +150,7 @@ export function ChatWidget({
           setScore(response.score);
         }
         setLastAction(response.action_label ?? null);
+        setMemoryLabel(response.memory_label ?? memoryLabel);
       } catch (error) {
         setMessages((current) => [
           ...current,
@@ -129,6 +173,7 @@ export function ChatWidget({
       resolvedBusinessSlug,
       sessionId,
       showIdentity,
+      memoryLabel,
     ],
   );
 
@@ -266,6 +311,13 @@ export function ChatWidget({
         )}
       </div>
 
+      {memoryLabel && authenticated && (
+        <div className="chat-score" style={{ justifyContent: "flex-start", gap: 8 }}>
+          <Bot size={14} />
+          <span>Remembering: <strong>{memoryLabel}</strong></span>
+        </div>
+      )}
+
       {lastAction && (
         <div className="chat-score" style={{ justifyContent: "flex-start", gap: 8 }}>
           <Sparkles size={14} />
@@ -285,10 +337,11 @@ export function ChatWidget({
           ref={inputRef}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
-          placeholder="Ask about pricing, setup or a demo…"
+          disabled={!historyLoaded}
+          placeholder={authenticated ? "Ask about a lead or give Vireqo an action…" : "Ask about pricing, setup or a demo…"}
         />
 
-        <button type="submit" aria-label="Send message" disabled={loading}>
+        <button type="submit" aria-label="Send message" disabled={loading || !historyLoaded}>
           {loading ? <LoaderCircle className="spin" size={17} /> : <ArrowUp size={17} />}
         </button>
       </form>
