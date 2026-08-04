@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models import Appointment, Lead, User
 from ..schemas import AnalyticsSummary, LeadPublic
 from ..security import get_current_user
+from ..services.executive_insights import build_executive_insights
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -51,3 +52,12 @@ def summary(
         temperatures=temperatures,
         recent_leads=[LeadPublic.model_validate(item) for item in recent],
     )
+
+
+@router.get("/insights")
+def executive_insights(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return deterministic, workspace-scoped executive intelligence."""
+    return build_executive_insights(db, current_user)

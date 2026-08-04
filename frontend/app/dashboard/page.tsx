@@ -2,10 +2,32 @@
 
 import { DashboardShell } from "@/components/DashboardShell";
 import { LeadTable } from "@/components/LeadTable";
-import { clearSession, getAnalytics, getCurrentUser, getLeads, updateLeadStatus } from "@/lib/api";
-import type { Analytics, Lead, User } from "@/lib/types";
+import {
+  clearSession,
+  getAnalytics,
+  getCurrentUser,
+  getExecutiveInsights,
+  getLeads,
+  updateLeadStatus,
+} from "@/lib/api";
+import type { Analytics, ExecutiveInsights, Lead, User } from "@/lib/types";
 import { motion } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight, CalendarCheck2, Flame, LoaderCircle, Sparkles, Target, UsersRound } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  BellRing,
+  CalendarCheck2,
+  CheckCircle2,
+  Flame,
+  Gauge,
+  LoaderCircle,
+  MessageSquareText,
+  Sparkles,
+  Target,
+  TrendingUp,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -21,6 +43,7 @@ type RangeDays = keyof typeof chartByRange;
 export default function DashboardPage() {
   const router = useRouter();
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [insights, setInsights] = useState<ExecutiveInsights | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
@@ -28,13 +51,15 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [currentUser, summary, items] = await Promise.all([
+      const [currentUser, summary, executive, items] = await Promise.all([
         getCurrentUser(),
         getAnalytics(),
+        getExecutiveInsights(),
         getLeads({ limit: 100 }),
       ]);
       setUser(currentUser);
       setAnalytics(summary);
+      setInsights(executive);
       setLeads(items);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load the dashboard";
@@ -56,7 +81,9 @@ export default function DashboardPage() {
     setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status } : item));
     try {
       await updateLeadStatus(lead.id, status);
-      setAnalytics(await getAnalytics());
+      const [summary, executive] = await Promise.all([getAnalytics(), getExecutiveInsights()]);
+      setAnalytics(summary);
+      setInsights(executive);
     } catch {
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: previous } : item));
       setError("Status update failed. The previous value was restored.");
@@ -72,21 +99,89 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      {!analytics ? (
-        <div className="dashboard-loading"><LoaderCircle className="spin" size={28} /><strong>Preparing your opportunity intelligence</strong><p>{error || "Connecting to the Vireqo API…"}</p></div>
+      {!analytics || !insights ? (
+        <div className="dashboard-loading"><LoaderCircle className="spin" size={28} /><strong>Preparing your executive intelligence</strong><p>{error || "Analysing your workspace…"}</p></div>
       ) : (
         <>
           <div className="dashboard-welcome">
-            <div><span className="dashboard-eyebrow"><i /> Live workspace</span><h1>Good evening, {firstName}.</h1><p>Your pipeline has <strong>{analytics.temperatures.hot ?? 0} high-intent opportunities</strong> ready for attention.</p></div>
+            <div><span className="dashboard-eyebrow"><i /> AI executive workspace</span><h1>Good evening, {firstName}.</h1><p>{insights.executive_summary}</p></div>
             <Link className="button button-dashboard" href="/dashboard/ai-assistant"><Sparkles size={17} /> Open AI briefing</Link>
           </div>
           {error && <div className="dashboard-alert">{error}</div>}
-          <div className="metric-grid">
-            <Metric icon={UsersRound} label="Total opportunities" value={analytics.total_leads} trend="Live" positive />
-            <Metric icon={Flame} label="High-intent leads" value={analytics.temperatures.hot ?? 0} trend="Prioritised" positive />
-            <Metric icon={CalendarCheck2} label="Appointments" value={analytics.appointments} trend="All time" positive />
-            <Metric icon={Target} label="Average intent" value={`${analytics.average_score}`} trend="/ 100" positive />
+
+          <section className="executive-hero-card">
+            <div className="executive-summary-copy">
+              <span className="executive-kicker"><Sparkles size={14} /> Executive briefing</span>
+              <h2>{insights.health.label} momentum across your workspace.</h2>
+              <p>{insights.executive_summary}</p>
+              <Link href={insights.recommended_action.href} className="executive-action-link">
+                <span><small>Recommended next action</small><strong>{insights.recommended_action.title}</strong><em>{insights.recommended_action.detail}</em></span>
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+            <div className="health-score-panel">
+              <div className="health-score-ring" style={{ "--health": insights.health.score } as React.CSSProperties}>
+                <div><strong>{insights.health.score}</strong><span>/ 100</span></div>
+              </div>
+              <div><small>Business health</small><h3>{insights.health.label}</h3><p>Calculated from live CRM signals.</p></div>
+            </div>
+          </section>
+
+          <div className="executive-layout-grid">
+            <section className="priority-panel">
+              <div className="executive-panel-heading"><div><span>Today&apos;s focus</span><h3>Ranked priorities</h3></div><Target size={18} /></div>
+              <div className="priority-list">
+                {insights.priorities.map((priority, index) => (
+                  <Link href={priority.href} className={`priority-item urgency-${priority.urgency}`} key={`${priority.title}-${index}`}>
+                    <span className="priority-number">{String(index + 1).padStart(2, "0")}</span>
+                    <span><strong>{priority.title}</strong><small>{priority.detail}</small></span>
+                    <ArrowUpRight size={15} />
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            <section className="health-breakdown-panel">
+              <div className="executive-panel-heading"><div><span>Business health</span><h3>Signal breakdown</h3></div><Gauge size={18} /></div>
+              <div className="health-bars">
+                {Object.entries({
+                  "Lead quality": insights.health.components.lead_quality,
+                  Pipeline: insights.health.components.pipeline,
+                  "Follow-up": insights.health.components.follow_up,
+                  Appointments: insights.health.components.appointments,
+                  "Response speed": insights.health.components.response_speed,
+                }).map(([label, value]) => (
+                  <div className="health-bar-row" key={label}>
+                    <div><span>{label}</span><strong>{value}</strong></div>
+                    <i><b style={{ width: `${value}%` }} /></i>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="smart-notifications-panel">
+              <div className="executive-panel-heading"><div><span>AI notification center</span><h3>Signals requiring context</h3></div><BellRing size={18} /></div>
+              <div className="smart-notification-list">
+                {insights.notifications.length ? insights.notifications.map((notification, index) => (
+                  <Link href={notification.href} className={`smart-notification kind-${notification.kind}`} key={`${notification.title}-${index}`}>
+                    <span className="notification-symbol"><MessageSquareText size={15} /></span>
+                    <span><strong>{notification.title}</strong><small>{notification.detail}</small></span>
+                    <ArrowRight size={14} />
+                  </Link>
+                )) : <div className="executive-empty"><CheckCircle2 size={20} /><strong>No urgent signals</strong><span>Your workspace is clear.</span></div>}
+              </div>
+            </section>
           </div>
+
+          <div className="metric-grid executive-metric-grid">
+            <Metric icon={TrendingUp} label="Pipeline health" value={`${insights.metrics.pipeline_health}%`} trend="Live score" positive />
+            <Metric icon={Flame} label="Lead quality" value={`${insights.metrics.lead_quality}%`} trend={`${analytics.temperatures.hot ?? 0} hot`} positive />
+            <Metric icon={CalendarCheck2} label="Today&apos;s meetings" value={insights.metrics.today_appointments} trend="Scheduled" positive />
+            <Metric icon={Sparkles} label="AI confidence" value={`${insights.metrics.ai_confidence}%`} trend={insights.metrics.top_source} positive />
+            <Metric icon={UsersRound} label="Follow-up rate" value={`${insights.metrics.follow_up_rate}%`} trend={`${insights.metrics.overdue_follow_ups} overdue`} positive={insights.metrics.overdue_follow_ups === 0} />
+            <Metric icon={Target} label="Weighted forecast" value={insights.metrics.weighted_forecast ?? "Add budgets"} trend={insights.metrics.pipeline_value ? `${insights.metrics.pipeline_value} total` : "Budget data needed"} positive />
+          </div>
+
           <div className="dashboard-insight-grid">
             <section className="pipeline-chart-card">
               <div className="card-heading">

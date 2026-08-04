@@ -5,8 +5,8 @@ import type {
   AuthSession,
   Business,
   ChatResponse,
-  ChatHistory,
   Conversation,
+  ExecutiveInsights,
   ForgotPasswordResult,
   Lead,
   TeamMember,
@@ -252,6 +252,10 @@ export async function getAnalytics(): Promise<Analytics> {
   return authenticatedRequest<Analytics>("/analytics/summary");
 }
 
+export async function getExecutiveInsights(): Promise<ExecutiveInsights> {
+  return authenticatedRequest<ExecutiveInsights>("/analytics/insights");
+}
+
 export async function getLeads(params: {
   status?: string;
   temperature?: string;
@@ -399,10 +403,4 @@ export async function sendWorkspaceChat(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
-}
-
-export async function getWorkspaceChatHistory(sessionId: string): Promise<ChatHistory> {
-  return authenticatedRequest<ChatHistory>(
-    `/chat/workspace/history/${encodeURIComponent(sessionId)}`,
-  );
 }

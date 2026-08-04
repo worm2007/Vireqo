@@ -89,6 +89,57 @@ export type Analytics = {
   recent_leads: Lead[];
 };
 
+
+export type ExecutivePriority = {
+  type: string;
+  title: string;
+  detail: string;
+  href: string;
+  urgency: "high" | "medium" | "normal" | string;
+};
+
+export type ExecutiveNotification = {
+  kind: string;
+  title: string;
+  detail: string;
+  href: string;
+};
+
+export type ExecutiveInsights = {
+  generated_at: string;
+  health: {
+    score: number;
+    label: string;
+    components: {
+      lead_quality: number;
+      pipeline: number;
+      follow_up: number;
+      appointments: number;
+      response_speed: number;
+    };
+  };
+  executive_summary: string;
+  recommended_action: {
+    title: string;
+    detail: string;
+    href: string;
+  };
+  priorities: ExecutivePriority[];
+  notifications: ExecutiveNotification[];
+  metrics: {
+    pipeline_health: number;
+    lead_quality: number;
+    follow_up_rate: number;
+    response_speed: number;
+    ai_confidence: number;
+    pipeline_value?: string | null;
+    weighted_forecast?: string | null;
+    top_source: string;
+    today_appointments: number;
+    overdue_follow_ups: number;
+  };
+};
+
 export type ChatResponse = {
   session_id: string;
   reply: string;
@@ -96,16 +147,6 @@ export type ChatResponse = {
   lead_id?: string | null;
   score?: number | null;
   temperature?: string | null;
-  action_type?: string | null;
-  action_label?: string | null;
-  action_entity_id?: string | null;
-  memory_label?: string | null;
-};
-
-export type ChatHistory = {
-  session_id: string;
-  messages: Array<{ role: "assistant" | "user"; content: string }>;
-  memory_label?: string | null;
 };
 
 export type ForgotPasswordResult = {
