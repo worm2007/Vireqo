@@ -7,11 +7,13 @@ import {
   deleteLead,
   getLeadIntelligence,
   getLeads,
+  getRevenueForecast,
   updateLead,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Lead, LeadIntelligence } from "@/lib/types";
+import type { Lead, LeadIntelligence, RevenueForecast } from "@/lib/types";
 import {
+  AlertTriangle,
   BrainCircuit,
   LoaderCircle,
   Pencil,
@@ -19,6 +21,8 @@ import {
   Save,
   Search,
   Trash2,
+  TrendingUp,
+  WalletCards,
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -75,6 +79,7 @@ export default function OpportunitiesPage() {
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [intelligence, setIntelligence] = useState<LeadIntelligence | null>(null);
+  const [forecast, setForecast] = useState<RevenueForecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState("");
@@ -95,7 +100,7 @@ export default function OpportunitiesPage() {
     setError("");
 
     try {
-      const [items, predictive] = await Promise.all([
+      const [items, predictive, revenue] = await Promise.all([
         getLeads({
           search,
           status,
@@ -103,10 +108,12 @@ export default function OpportunitiesPage() {
           limit: 500,
         }),
         getLeadIntelligence().catch(() => null),
+        getRevenueForecast().catch(() => null),
       ]);
 
       setLeads(items);
       setIntelligence(predictive);
+      setForecast(revenue);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load opportunities",
@@ -123,7 +130,7 @@ export default function OpportunitiesPage() {
 
   useWorkspaceEvent(() => {
     void load(true);
-  }, ["lead."]);
+  }, ["lead.", "appointment.", "conversation."]);
 
   const predictionMap = useMemo(() => {
     return new Map((intelligence?.predictions ?? []).map((item) => [item.lead_id, item]));
@@ -336,6 +343,52 @@ export default function OpportunitiesPage() {
               <em>{topPrediction.conversion_probability}%</em>
             </button>
           )}
+        </section>
+      )}
+
+      {forecast && (
+        <section className="opportunity-forecast-grid">
+          <div className="opportunity-forecast-card">
+            <span className="dashboard-eyebrow"><i /> Revenue forecast</span>
+            <div className="opportunity-forecast-header">
+              <div>
+                <h2>{forecast.summary.weighted_forecast_label}</h2>
+                <p>{forecast.summary.recommendation}</p>
+              </div>
+              <WalletCards size={22} />
+            </div>
+            <div className="opportunity-forecast-metrics">
+              <div><strong>{forecast.summary.pipeline_value_label}</strong><span>pipeline</span></div>
+              <div><strong>{forecast.summary.likely_this_month_label}</strong><span>likely this month</span></div>
+              <div><strong>{forecast.summary.forecast_confidence}%</strong><span>confidence</span></div>
+            </div>
+          </div>
+
+          <div className="opportunity-risk-card">
+            <div className="opportunity-risk-header">
+              <div>
+                <span className="dashboard-eyebrow"><i /> At-risk revenue</span>
+                <h2>{forecast.summary.at_risk_value_label}</h2>
+              </div>
+              <AlertTriangle size={22} />
+            </div>
+            <div className="at-risk-lead-list">
+              {forecast.at_risk_leads.length ? forecast.at_risk_leads.slice(0, 3).map((risk) => (
+                <button
+                  className={`at-risk-lead risk-${risk.risk_level}`}
+                  key={risk.lead_id}
+                  type="button"
+                  onClick={() => {
+                    const lead = leads.find((item) => item.id === risk.lead_id);
+                    if (lead) startEditing(lead);
+                  }}
+                >
+                  <span><strong>{risk.name}</strong><small>{risk.reason}</small></span>
+                  <em>{risk.estimated_value_label}</em>
+                </button>
+              )) : <div className="forecast-empty"><TrendingUp size={18} /> No revenue risk detected.</div>}
+            </div>
+          </div>
         </section>
       )}
 

@@ -3740,3 +3740,344 @@ button { cursor: pointer; }
     max-width: 100%;
   }
 }
+
+/* ========================================================================== 
+   Sprint 2.4.2 — Revenue forecast and at-risk revenue monitor
+   ========================================================================== */
+
+.revenue-forecast-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
+  margin: 18px 0;
+  padding: 20px;
+  border: 1px solid rgba(17, 17, 15, .08);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(199, 255, 66, .28), transparent 34%),
+    linear-gradient(135deg, #1b4032 0%, #0f251d 100%);
+  color: #fff;
+  box-shadow: 0 26px 70px rgba(22, 58, 45, .18);
+}
+
+.revenue-forecast-card .executive-kicker {
+  color: rgba(255, 255, 255, .72);
+}
+
+.revenue-forecast-main h2 {
+  margin: 12px 0 6px;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -.06em;
+}
+
+.revenue-forecast-main p {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(255, 255, 255, .68);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.revenue-forecast-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.revenue-forecast-values > div {
+  min-height: 86px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .07);
+  backdrop-filter: blur(16px);
+}
+
+.revenue-forecast-values span,
+.forecast-confidence-panel small {
+  display: block;
+  color: rgba(255, 255, 255, .56);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.revenue-forecast-values strong {
+  display: block;
+  margin-top: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 21px;
+  letter-spacing: -.05em;
+}
+
+.revenue-forecast-values .risk strong {
+  color: #ffd3c7;
+}
+
+.forecast-confidence-panel {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  min-height: 220px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .07);
+  text-align: center;
+}
+
+.forecast-confidence-ring {
+  --confidence: 0;
+  width: 126px;
+  height: 126px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at center, #183b2f 0 57%, transparent 58%),
+    conic-gradient(var(--lime) calc(var(--confidence) * 1%), rgba(255, 255, 255, .13) 0);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+
+.forecast-confidence-ring strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 34px;
+  letter-spacing: -.07em;
+}
+
+.forecast-confidence-ring span {
+  margin-left: -14px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .7);
+}
+
+.forecast-confidence-panel p {
+  max-width: 190px;
+  margin: 0;
+  color: rgba(255, 255, 255, .58);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.forecast-detail-grid,
+.opportunity-forecast-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .55fr);
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.forecast-panel,
+.opportunity-forecast-card,
+.opportunity-risk-card {
+  border: 1px solid rgba(17, 17, 15, .08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .74);
+  box-shadow: 0 18px 48px rgba(24, 43, 34, .06);
+}
+
+.forecast-panel {
+  padding: 16px;
+}
+
+.forecast-bucket-list,
+.at-risk-lead-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.forecast-bucket {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(17, 17, 15, .07);
+  border-radius: 14px;
+  background: #fbfaf6;
+}
+
+.forecast-bucket strong,
+.at-risk-lead strong {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.forecast-bucket span,
+.at-risk-lead small {
+  display: block;
+  margin-top: 3px;
+  color: #7a7e75;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.forecast-bucket em,
+.at-risk-lead em {
+  color: var(--forest);
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: -.04em;
+}
+
+.forecast-bucket i {
+  grid-column: 1 / -1;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(22, 58, 45, .08);
+  overflow: hidden;
+}
+
+.forecast-bucket i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.at-risk-lead {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(148, 72, 55, .12);
+  border-radius: 14px;
+  background: rgba(255, 250, 247, .92);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.at-risk-lead:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(148, 72, 55, .08);
+}
+
+.at-risk-lead.risk-critical,
+.at-risk-lead.risk-high {
+  background: linear-gradient(135deg, rgba(255, 239, 233, .94), #fff);
+}
+
+.at-risk-lead.risk-critical em,
+.at-risk-lead.risk-high em {
+  color: #944837;
+}
+
+.opportunity-forecast-card,
+.opportunity-risk-card {
+  padding: 17px;
+}
+
+.opportunity-forecast-header,
+.opportunity-risk-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.opportunity-forecast-header h2,
+.opportunity-risk-header h2 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 32px;
+  letter-spacing: -.06em;
+}
+
+.opportunity-forecast-header p {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: #74786f;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.opportunity-forecast-header svg,
+.opportunity-risk-header svg {
+  color: var(--forest);
+}
+
+.opportunity-forecast-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.opportunity-forecast-metrics > div {
+  padding: 11px;
+  border: 1px solid rgba(17, 17, 15, .07);
+  border-radius: 13px;
+  background: #fbfaf6;
+}
+
+.opportunity-forecast-metrics strong {
+  display: block;
+  font-size: 15px;
+}
+
+.opportunity-forecast-metrics span {
+  display: block;
+  margin-top: 4px;
+  color: #858980;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.forecast-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 12px;
+  border: 1px solid rgba(17, 17, 15, .07);
+  border-radius: 13px;
+  background: #fbfaf6;
+  color: #73776f;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+@media (max-width: 1180px) {
+  .revenue-forecast-card,
+  .forecast-detail-grid,
+  .opportunity-forecast-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-confidence-panel {
+    min-height: 160px;
+  }
+}
+
+@media (max-width: 760px) {
+  .revenue-forecast-values,
+  .opportunity-forecast-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 540px) {
+  .revenue-forecast-values,
+  .opportunity-forecast-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-bucket,
+  .at-risk-lead {
+    grid-template-columns: 1fr;
+  }
+}

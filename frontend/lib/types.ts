@@ -78,6 +78,85 @@ export type LeadIntelligence = {
   predictions: LeadPrediction[];
 };
 
+export type RevenueForecastStage = {
+  stage: string;
+  count: number;
+  pipeline_value: number;
+  weighted_value: number;
+  pipeline_value_label: string;
+  weighted_value_label: string;
+};
+
+export type RevenueForecastBucket = {
+  window: string;
+  count: number;
+  pipeline_value: number;
+  weighted_value: number;
+  pipeline_value_label: string;
+  weighted_value_label: string;
+};
+
+export type RevenueForecastOpportunity = {
+  lead_id: string;
+  name: string;
+  company: string;
+  status: string;
+  estimated_value: number;
+  estimated_value_label: string;
+  weighted_value: number;
+  weighted_value_label: string;
+  conversion_probability: number;
+  expected_window: string;
+  next_action: string;
+};
+
+export type AtRiskRevenueLead = {
+  lead_id: string;
+  name: string;
+  company: string;
+  status: string;
+  estimated_value: number;
+  estimated_value_label: string;
+  conversion_probability: number;
+  risk_level: "critical" | "high" | "medium" | string;
+  reason: string;
+  next_action: string;
+};
+
+export type RevenueForecast = {
+  generated_at: string;
+  currency: string;
+  summary: {
+    pipeline_value: number;
+    pipeline_value_label: string;
+    weighted_forecast: number;
+    weighted_forecast_label: string;
+    likely_this_month: number;
+    likely_this_month_label: string;
+    at_risk_value: number;
+    at_risk_value_label: string;
+    committed_value: number;
+    committed_value_label: string;
+    forecast_confidence: number;
+    forecast_label: string;
+    recommendation: string;
+  };
+  signals: {
+    open_leads_count: number;
+    with_budget_count: number;
+    missing_budget_count: number;
+    high_value_count: number;
+    at_risk_count: number;
+    hot_value: number;
+    warm_value: number;
+    cold_value: number;
+  };
+  stage_forecast: RevenueForecastStage[];
+  monthly_buckets: RevenueForecastBucket[];
+  forecast_opportunities: RevenueForecastOpportunity[];
+  at_risk_leads: AtRiskRevenueLead[];
+};
+
 export type Appointment = {
   id: string;
   lead_id?: string | null;

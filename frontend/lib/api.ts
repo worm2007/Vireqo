@@ -11,6 +11,7 @@ import type {
   ForgotPasswordResult,
   Lead,
   LeadIntelligence,
+  RevenueForecast,
   TeamMember,
   User,
   WorkspaceDraftRequest,
@@ -262,6 +263,10 @@ export async function getExecutiveInsights(): Promise<ExecutiveInsights> {
 
 export async function getLeadIntelligence(): Promise<LeadIntelligence> {
   return authenticatedRequest<LeadIntelligence>("/analytics/lead-intelligence");
+}
+
+export async function getRevenueForecast(): Promise<RevenueForecast> {
+  return authenticatedRequest<RevenueForecast>("/analytics/revenue-forecast");
 }
 
 export async function getLeads(params: {

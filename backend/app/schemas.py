@@ -225,6 +225,89 @@ class LeadIntelligenceResponse(BaseModel):
     predictions: list[LeadPrediction]
 
 
+class RevenueForecastSummary(BaseModel):
+    pipeline_value: int
+    pipeline_value_label: str
+    weighted_forecast: int
+    weighted_forecast_label: str
+    likely_this_month: int
+    likely_this_month_label: str
+    at_risk_value: int
+    at_risk_value_label: str
+    committed_value: int
+    committed_value_label: str
+    forecast_confidence: int
+    forecast_label: str
+    recommendation: str
+
+
+class RevenueForecastSignals(BaseModel):
+    open_leads_count: int
+    with_budget_count: int
+    missing_budget_count: int
+    high_value_count: int
+    at_risk_count: int
+    hot_value: int
+    warm_value: int
+    cold_value: int
+
+
+class RevenueForecastStage(BaseModel):
+    stage: str
+    count: int
+    pipeline_value: int
+    weighted_value: int
+    pipeline_value_label: str
+    weighted_value_label: str
+
+
+class RevenueForecastBucket(BaseModel):
+    window: str
+    count: int
+    pipeline_value: int
+    weighted_value: int
+    pipeline_value_label: str
+    weighted_value_label: str
+
+
+class RevenueForecastOpportunity(BaseModel):
+    lead_id: str
+    name: str
+    company: str
+    status: str
+    estimated_value: int
+    estimated_value_label: str
+    weighted_value: int
+    weighted_value_label: str
+    conversion_probability: int
+    expected_window: str
+    next_action: str
+
+
+class AtRiskRevenueLead(BaseModel):
+    lead_id: str
+    name: str
+    company: str
+    status: str
+    estimated_value: int
+    estimated_value_label: str
+    conversion_probability: int
+    risk_level: str
+    reason: str
+    next_action: str
+
+
+class RevenueForecastResponse(BaseModel):
+    generated_at: datetime
+    currency: str
+    summary: RevenueForecastSummary
+    signals: RevenueForecastSignals
+    stage_forecast: list[RevenueForecastStage] = Field(default_factory=list)
+    monthly_buckets: list[RevenueForecastBucket] = Field(default_factory=list)
+    forecast_opportunities: list[RevenueForecastOpportunity] = Field(default_factory=list)
+    at_risk_leads: list[AtRiskRevenueLead] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     session_id: str = Field(min_length=6, max_length=120)
     message: str = Field(min_length=1, max_length=4000)

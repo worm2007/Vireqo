@@ -9,9 +9,10 @@ import {
   getCurrentUser,
   getExecutiveInsights,
   getLeads,
+  getRevenueForecast,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Analytics, ExecutiveInsights, Lead, User } from "@/lib/types";
+import type { Analytics, ExecutiveInsights, Lead, RevenueForecast, User } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowDownRight,
@@ -27,6 +28,8 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  ShieldAlert,
+  WalletCards,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -45,6 +48,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [insights, setInsights] = useState<ExecutiveInsights | null>(null);
+  const [forecast, setForecast] = useState<RevenueForecast | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
@@ -52,15 +56,17 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [currentUser, summary, executive, items] = await Promise.all([
+      const [currentUser, summary, executive, revenue, items] = await Promise.all([
         getCurrentUser(),
         getAnalytics(),
         getExecutiveInsights(),
+        getRevenueForecast(),
         getLeads({ limit: 100 }),
       ]);
       setUser(currentUser);
       setAnalytics(summary);
       setInsights(executive);
+      setForecast(revenue);
       setLeads(items);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load the dashboard";
@@ -86,9 +92,10 @@ export default function DashboardPage() {
     setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status } : item));
     try {
       await updateLeadStatus(lead.id, status);
-      const [summary, executive] = await Promise.all([getAnalytics(), getExecutiveInsights()]);
+      const [summary, executive, revenue] = await Promise.all([getAnalytics(), getExecutiveInsights(), getRevenueForecast()]);
       setAnalytics(summary);
       setInsights(executive);
+      setForecast(revenue);
     } catch {
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: previous } : item));
       setError("Status update failed. The previous value was restored.");
@@ -104,7 +111,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      {!analytics || !insights ? (
+      {!analytics || !insights || !forecast ? (
         <div className="dashboard-loading"><LoaderCircle className="spin" size={28} /><strong>Preparing your executive intelligence</strong><p>{error || "Analysing your workspace…"}</p></div>
       ) : (
         <>
@@ -184,7 +191,70 @@ export default function DashboardPage() {
             <Metric icon={CalendarCheck2} label="Today&apos;s meetings" value={insights.metrics.today_appointments} trend="Scheduled" positive />
             <Metric icon={Sparkles} label="AI confidence" value={`${insights.metrics.ai_confidence}%`} trend={insights.metrics.top_source} positive />
             <Metric icon={UsersRound} label="Follow-up rate" value={`${insights.metrics.follow_up_rate}%`} trend={`${insights.metrics.overdue_follow_ups} overdue`} positive={insights.metrics.overdue_follow_ups === 0} />
-            <Metric icon={Target} label="Weighted forecast" value={insights.metrics.weighted_forecast ?? "Add budgets"} trend={insights.metrics.pipeline_value ? `${insights.metrics.pipeline_value} total` : "Budget data needed"} positive />
+            <Metric icon={Target} label="Weighted forecast" value={forecast.summary.weighted_forecast_label} trend={`${forecast.summary.pipeline_value_label} pipeline`} positive />
+          </div>
+
+          <section className="revenue-forecast-card">
+            <div className="revenue-forecast-main">
+              <span className="executive-kicker"><WalletCards size={14} /> Revenue forecast</span>
+              <h2>{forecast.summary.forecast_label}</h2>
+              <p>{forecast.summary.recommendation}</p>
+
+              <div className="revenue-forecast-values">
+                <div>
+                  <span>Pipeline value</span>
+                  <strong>{forecast.summary.pipeline_value_label}</strong>
+                </div>
+                <div>
+                  <span>Weighted forecast</span>
+                  <strong>{forecast.summary.weighted_forecast_label}</strong>
+                </div>
+                <div>
+                  <span>Likely this month</span>
+                  <strong>{forecast.summary.likely_this_month_label}</strong>
+                </div>
+                <div className={forecast.summary.at_risk_value > 0 ? "risk" : ""}>
+                  <span>At-risk revenue</span>
+                  <strong>{forecast.summary.at_risk_value_label}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="forecast-confidence-panel">
+              <div className="forecast-confidence-ring" style={{ "--confidence": forecast.summary.forecast_confidence } as React.CSSProperties}>
+                <strong>{forecast.summary.forecast_confidence}</strong>
+                <span>%</span>
+              </div>
+              <small>Forecast confidence</small>
+              <p>{forecast.signals.with_budget_count} leads with budget · {forecast.signals.missing_budget_count} missing budget</p>
+            </div>
+          </section>
+
+          <div className="forecast-detail-grid">
+            <section className="forecast-panel">
+              <div className="executive-panel-heading"><div><span>Close windows</span><h3>Next 90 days</h3></div><TrendingUp size={18} /></div>
+              <div className="forecast-bucket-list">
+                {forecast.monthly_buckets.map((bucket) => (
+                  <div className="forecast-bucket" key={bucket.window}>
+                    <div><strong>{bucket.window}</strong><span>{bucket.count} opportunities</span></div>
+                    <em>{bucket.weighted_value_label}</em>
+                    <i><b style={{ width: `${Math.min(100, forecast.summary.weighted_forecast ? (bucket.weighted_value / forecast.summary.weighted_forecast) * 100 : 0)}%` }} /></i>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="forecast-panel at-risk-panel">
+              <div className="executive-panel-heading"><div><span>Risk monitor</span><h3>Revenue that may slip</h3></div><ShieldAlert size={18} /></div>
+              <div className="at-risk-lead-list compact">
+                {forecast.at_risk_leads.length ? forecast.at_risk_leads.slice(0, 4).map((risk) => (
+                  <Link href={`/dashboard/opportunities?edit=${risk.lead_id}`} className={`at-risk-lead risk-${risk.risk_level}`} key={risk.lead_id}>
+                    <span><strong>{risk.name}</strong><small>{risk.reason}</small></span>
+                    <em>{risk.estimated_value_label}</em>
+                  </Link>
+                )) : <div className="executive-empty"><CheckCircle2 size={20} /><strong>No at-risk revenue</strong><span>Open opportunities look stable.</span></div>}
+              </div>
+            </section>
           </div>
 
           <div className="dashboard-insight-grid">

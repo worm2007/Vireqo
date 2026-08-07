@@ -8,10 +8,18 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Appointment, Conversation, Lead, User
-from ..schemas import AnalyticsSummary, LeadIntelligenceResponse, LeadIntelligenceSummary, LeadPrediction, LeadPublic
+from ..schemas import (
+    AnalyticsSummary,
+    LeadIntelligenceResponse,
+    LeadIntelligenceSummary,
+    LeadPrediction,
+    LeadPublic,
+    RevenueForecastResponse,
+)
 from ..security import get_current_user
 from ..services.executive_insights import build_executive_insights
 from ..services.lead_scoring import calculate_lead_intelligence
+from ..services.revenue_forecast import build_revenue_forecast
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -64,6 +72,17 @@ def executive_insights(
 ) -> dict:
     """Return deterministic, workspace-scoped executive intelligence."""
     return build_executive_insights(db, current_user)
+
+
+
+
+@router.get("/revenue-forecast", response_model=RevenueForecastResponse)
+def revenue_forecast(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RevenueForecastResponse:
+    """Return revenue forecast, weighted pipeline and at-risk opportunity signals."""
+    return RevenueForecastResponse.model_validate(build_revenue_forecast(db, current_user))
 
 
 @router.get("/lead-intelligence", response_model=LeadIntelligenceResponse)
