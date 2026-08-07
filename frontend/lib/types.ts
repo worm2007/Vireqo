@@ -343,6 +343,40 @@ export type AuditLog = {
 };
 
 
+
+export type LeadTimelineItem = {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  tone: "positive" | "neutral" | "warning" | "negative" | string;
+  metadata: Record<string, unknown>;
+};
+
+export type LeadActivitySummary = {
+  activity_count: number;
+  latest_touch_at?: string | null;
+  upcoming_meeting_at?: string | null;
+  relationship_health: string;
+  risk_level: "low" | "medium" | "high" | "won" | "closed" | string;
+  risk_reason: string;
+  next_action: string;
+  appointment_count: number;
+  conversation_count: number;
+  audit_count: number;
+};
+
+export type LeadDetail = {
+  lead: Lead;
+  prediction?: LeadPrediction | null;
+  summary: LeadActivitySummary;
+  appointments: Appointment[];
+  conversations: Conversation[];
+  audits: AuditLog[];
+  timeline: LeadTimelineItem[];
+};
+
 export type WorkspaceDraftRequest = {
   draft_type: string;
   recipient?: string;

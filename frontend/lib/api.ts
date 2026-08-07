@@ -10,6 +10,7 @@ import type {
   ExecutiveInsights,
   ForgotPasswordResult,
   Lead,
+  LeadDetail,
   LeadIntelligence,
   RevenueForecast,
   TeamMember,
@@ -294,6 +295,11 @@ export async function createLead(payload: Partial<Lead>): Promise<Lead> {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+
+export async function getLeadDetail(id: string): Promise<LeadDetail> {
+  return authenticatedRequest<LeadDetail>(`/leads/${encodeURIComponent(id)}/activity`);
 }
 
 export async function updateLead(id: string, payload: Partial<Lead>): Promise<Lead> {

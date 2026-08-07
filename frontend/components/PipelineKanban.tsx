@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Flame,
   GripVertical,
+  Eye,
   Pencil,
   Sparkles,
   Trash2,
@@ -57,6 +58,7 @@ type PipelineKanbanProps = {
   predictionMap: Map<string, LeadPrediction>;
   onStatusChange: (lead: Lead, nextStatus: Lead["status"]) => void | Promise<void>;
   onEdit: (lead: Lead) => void;
+  onOpenDetails: (lead: Lead) => void;
   onDelete: (id: string) => void | Promise<void>;
 };
 
@@ -82,6 +84,7 @@ export function PipelineKanban({
   predictionMap,
   onStatusChange,
   onEdit,
+  onOpenDetails,
   onDelete,
 }: PipelineKanbanProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -271,6 +274,13 @@ export function PipelineKanban({
                         </div>
 
                         <div className="pipeline-card-actions">
+                          <button
+                            aria-label={`Open detail view for ${lead.name}`}
+                            onClick={() => onOpenDetails(lead)}
+                            type="button"
+                          >
+                            <Eye size={14} />
+                          </button>
                           <button
                             aria-label={`Edit ${lead.name}`}
                             onClick={() => onEdit(lead)}

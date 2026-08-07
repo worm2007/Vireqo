@@ -1,22 +1,25 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { DealDetailDrawer } from "@/components/DealDetailDrawer";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
   deleteLead,
+  getLeadDetail,
   getLeadIntelligence,
   getLeads,
   getRevenueForecast,
   updateLead,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Lead, LeadIntelligence, RevenueForecast } from "@/lib/types";
+import type { Lead, LeadDetail, LeadIntelligence, RevenueForecast } from "@/lib/types";
 import {
   AlertTriangle,
   BrainCircuit,
   Columns3,
+  Eye,
   ListChecks,
   LoaderCircle,
   Pencil,
@@ -99,6 +102,12 @@ export default function OpportunitiesPage() {
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<LeadForm | null>(null);
 
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [leadDetail, setLeadDetail] = useState<LeadDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
   async function load(silent = false) {
     if (!silent) setLoading(true);
     setError("");
@@ -127,6 +136,36 @@ export default function OpportunitiesPage() {
     }
   }
 
+  async function loadLeadDetail(leadId: string, silent = false) {
+    if (!silent) setDetailLoading(true);
+    setDetailError("");
+
+    try {
+      const detail = await getLeadDetail(leadId);
+      setLeadDetail(detail);
+    } catch (err) {
+      setDetailError(
+        err instanceof Error ? err.message : "Unable to load deal details",
+      );
+    } finally {
+      if (!silent) setDetailLoading(false);
+    }
+  }
+
+  function openDetails(lead: Lead) {
+    setSelectedLeadId(lead.id);
+    setLeadDetail(null);
+    setDetailOpen(true);
+    void loadLeadDetail(lead.id);
+  }
+
+  function closeDetails() {
+    setDetailOpen(false);
+    setSelectedLeadId(null);
+    setLeadDetail(null);
+    setDetailError("");
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
     return () => window.clearTimeout(timer);
@@ -134,7 +173,8 @@ export default function OpportunitiesPage() {
 
   useWorkspaceEvent(() => {
     void load(true);
-  }, ["lead.", "appointment.", "conversation."]);
+    if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
+  }, ["lead.", "appointment.", "conversation.", "ai."]);
 
   const predictionMap = useMemo(() => {
     return new Map((intelligence?.predictions ?? []).map((item) => [item.lead_id, item]));
@@ -150,6 +190,17 @@ export default function OpportunitiesPage() {
     startEditing(requestedLead);
     router.replace("/dashboard/opportunities", { scroll: false });
   }, [editingLeadId, leads, loading, router, searchParams]);
+
+  useEffect(() => {
+    const requestedLeadId = searchParams.get("detail");
+    if (loading || !requestedLeadId || selectedLeadId === requestedLeadId) return;
+
+    const requestedLead = leads.find((lead) => lead.id === requestedLeadId);
+    if (!requestedLead) return;
+
+    openDetails(requestedLead);
+    router.replace("/dashboard/opportunities", { scroll: false });
+  }, [leads, loading, router, searchParams, selectedLeadId]);
 
   async function submitCreate(event: FormEvent) {
     event.preventDefault();
@@ -267,6 +318,9 @@ export default function OpportunitiesPage() {
       if (editingLeadId === id) {
         cancelEditing();
       }
+      if (selectedLeadId === id) {
+        closeDetails();
+      }
 
       setSuccess("Opportunity deleted.");
     } catch (err) {
@@ -274,6 +328,16 @@ export default function OpportunitiesPage() {
         err instanceof Error ? err.message : "Unable to delete opportunity",
       );
     }
+  }
+
+  function editFromDrawer(lead: Lead) {
+    closeDetails();
+    startEditing(lead);
+  }
+
+  async function changeStatusFromDrawer(lead: Lead, nextStatus: Lead["status"]) {
+    await changeStatus(lead, nextStatus);
+    if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
   }
 
   return (
@@ -337,7 +401,7 @@ export default function OpportunitiesPage() {
             <button
               className="predictive-best-lead"
               type="button"
-              onClick={() => startEditing(topLead)}
+              onClick={() => openDetails(topLead)}
             >
               <BrainCircuit size={17} />
               <span>
@@ -384,7 +448,7 @@ export default function OpportunitiesPage() {
                   type="button"
                   onClick={() => {
                     const lead = leads.find((item) => item.id === risk.lead_id);
-                    if (lead) startEditing(lead);
+                    if (lead) openDetails(lead);
                   }}
                 >
                   <span><strong>{risk.name}</strong><small>{risk.reason}</small></span>
@@ -779,6 +843,7 @@ export default function OpportunitiesPage() {
           predictionMap={predictionMap}
           onStatusChange={changeStatus}
           onEdit={startEditing}
+          onOpenDetails={openDetails}
           onDelete={remove}
         />
       ) : (
@@ -855,6 +920,20 @@ export default function OpportunitiesPage() {
                 </select>
 
                 <button
+                  className="button"
+                  type="button"
+                  onClick={() => openDetails(lead)}
+                  style={{
+                    minHeight: 38,
+                    padding: "0 12px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Eye size={15} />
+                  Details
+                </button>
+
+                <button
                   className="button button-dashboard"
                   type="button"
                   onClick={() => startEditing(lead)}
@@ -887,6 +966,19 @@ export default function OpportunitiesPage() {
           No opportunities match these filters.
         </div>
       )}
+
+      <DealDetailDrawer
+        open={detailOpen}
+        detail={leadDetail}
+        loading={detailLoading}
+        error={detailError}
+        onClose={closeDetails}
+        onEdit={editFromDrawer}
+        onRefresh={() => {
+          if (selectedLeadId) void loadLeadDetail(selectedLeadId);
+        }}
+        onStatusChange={changeStatusFromDrawer}
+      />
     </DashboardShell>
   );
 }

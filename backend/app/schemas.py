@@ -225,6 +225,8 @@ class LeadIntelligenceResponse(BaseModel):
     predictions: list[LeadPrediction]
 
 
+
+
 class RevenueForecastSummary(BaseModel):
     pipeline_value: int
     pipeline_value_label: str
@@ -504,3 +506,36 @@ class AuditLogPublic(BaseModel):
     details: str
     ip_address: str
     created_at: datetime
+
+class LeadTimelineItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    description: str
+    timestamp: datetime
+    tone: str = "neutral"
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class LeadActivitySummary(BaseModel):
+    activity_count: int
+    latest_touch_at: datetime | None = None
+    upcoming_meeting_at: datetime | None = None
+    relationship_health: str
+    risk_level: str
+    risk_reason: str
+    next_action: str
+    appointment_count: int
+    conversation_count: int
+    audit_count: int
+
+
+class LeadDetailResponse(BaseModel):
+    lead: LeadPublic
+    prediction: LeadPrediction | None = None
+    summary: LeadActivitySummary
+    appointments: list[AppointmentPublic] = Field(default_factory=list)
+    conversations: list[ConversationPublic] = Field(default_factory=list)
+    audits: list[AuditLogPublic] = Field(default_factory=list)
+    timeline: list[LeadTimelineItem] = Field(default_factory=list)
+

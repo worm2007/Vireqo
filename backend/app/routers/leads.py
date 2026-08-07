@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Business, Lead, User
-from ..schemas import LeadCreate, LeadPublic, LeadUpdate
+from ..schemas import LeadCreate, LeadDetailResponse, LeadPublic, LeadUpdate
 from ..security import get_current_user
 from ..services.audit import record_audit
+from ..services.lead_activity import build_lead_detail
 from ..services.lead_scoring import calculate_lead_score
 from ..services.realtime import workspace_events
 
@@ -127,6 +128,16 @@ def list_leads(
             .limit(limit)
         ).all()
     )
+
+
+@router.get("/{lead_id}/activity", response_model=LeadDetailResponse)
+def get_lead_activity(
+    lead_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LeadDetailResponse:
+    """Return a deal detail view with timeline, meetings, AI prediction and audit activity."""
+    return build_lead_detail(db, current_user, lead_id)
 
 
 @router.get("/{lead_id}", response_model=LeadPublic)
