@@ -10,17 +10,21 @@ import {
   getExecutiveInsights,
   getLeads,
   getRevenueForecast,
+  getWeeklyReport,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Analytics, ExecutiveInsights, Lead, RevenueForecast, User } from "@/lib/types";
+import type { Analytics, ExecutiveInsights, Lead, RevenueForecast, User, WeeklyReport } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  AlertTriangle,
   BellRing,
   CalendarCheck2,
   CheckCircle2,
+  ClipboardList,
+  FileText,
   Flame,
   Gauge,
   LoaderCircle,
@@ -29,6 +33,7 @@ import {
   Target,
   TrendingUp,
   ShieldAlert,
+  Trophy,
   WalletCards,
   UsersRound,
 } from "lucide-react";
@@ -49,6 +54,7 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [insights, setInsights] = useState<ExecutiveInsights | null>(null);
   const [forecast, setForecast] = useState<RevenueForecast | null>(null);
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
@@ -56,17 +62,19 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [currentUser, summary, executive, revenue, items] = await Promise.all([
+      const [currentUser, summary, executive, revenue, weekly, items] = await Promise.all([
         getCurrentUser(),
         getAnalytics(),
         getExecutiveInsights(),
         getRevenueForecast(),
+        getWeeklyReport(),
         getLeads({ limit: 100 }),
       ]);
       setUser(currentUser);
       setAnalytics(summary);
       setInsights(executive);
       setForecast(revenue);
+      setWeeklyReport(weekly);
       setLeads(items);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load the dashboard";
@@ -92,10 +100,16 @@ export default function DashboardPage() {
     setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status } : item));
     try {
       await updateLeadStatus(lead.id, status);
-      const [summary, executive, revenue] = await Promise.all([getAnalytics(), getExecutiveInsights(), getRevenueForecast()]);
+      const [summary, executive, revenue, weekly] = await Promise.all([
+        getAnalytics(),
+        getExecutiveInsights(),
+        getRevenueForecast(),
+        getWeeklyReport(),
+      ]);
       setAnalytics(summary);
       setInsights(executive);
       setForecast(revenue);
+      setWeeklyReport(weekly);
     } catch {
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: previous } : item));
       setError("Status update failed. The previous value was restored.");
@@ -111,7 +125,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      {!analytics || !insights || !forecast ? (
+      {!analytics || !insights || !forecast || !weeklyReport ? (
         <div className="dashboard-loading"><LoaderCircle className="spin" size={28} /><strong>Preparing your executive intelligence</strong><p>{error || "Analysing your workspace…"}</p></div>
       ) : (
         <>
@@ -256,6 +270,86 @@ export default function DashboardPage() {
               </div>
             </section>
           </div>
+
+          <section className="weekly-report-card">
+            <div className="weekly-report-copy">
+              <span className="executive-kicker"><FileText size={14} /> Weekly AI report</span>
+              <h2>{weeklyReport.headline}</h2>
+              <p>{weeklyReport.summary}</p>
+              <div className="weekly-report-range">
+                {new Date(weeklyReport.period_start).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                <span>→</span>
+                {new Date(weeklyReport.period_end).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              </div>
+            </div>
+
+            <div className="weekly-velocity-panel">
+              <div className="weekly-velocity-ring" style={{ "--velocity": weeklyReport.weekly_velocity } as React.CSSProperties}>
+                <strong>{weeklyReport.weekly_velocity}</strong>
+                <span>/100</span>
+              </div>
+              <small>Weekly velocity</small>
+              <p>{weeklyReport.metrics.new_leads} new leads · {weeklyReport.metrics.appointments_booked} booked meetings</p>
+            </div>
+
+            <div className="weekly-report-metrics">
+              <div><span>New pipeline</span><strong>{weeklyReport.metrics.pipeline_created_label}</strong><small>{weeklyReport.metrics.lead_growth_delta >= 0 ? "+" : ""}{weeklyReport.metrics.lead_growth_delta}% leads</small></div>
+              <div><span>Weighted forecast</span><strong>{weeklyReport.metrics.weighted_forecast_label}</strong><small>{weeklyReport.metrics.average_score} avg score</small></div>
+              <div className={weeklyReport.metrics.at_risk_value > 0 ? "risk" : ""}><span>At risk</span><strong>{weeklyReport.metrics.at_risk_value_label}</strong><small>{weeklyReport.metrics.overdue_follow_ups} overdue</small></div>
+              <div><span>Top source</span><strong>{weeklyReport.metrics.top_source}</strong><small>{weeklyReport.metrics.conversations} conversations</small></div>
+            </div>
+          </section>
+
+          <div className="weekly-report-grid">
+            <section className="weekly-report-panel">
+              <div className="executive-panel-heading"><div><span>What changed</span><h3>Highlights</h3></div><Trophy size={18} /></div>
+              <div className="weekly-highlight-list">
+                {weeklyReport.highlights.map((highlight, index) => (
+                  <div className="weekly-highlight" key={`${highlight}-${index}`}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <p>{highlight}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="weekly-report-panel action-plan-panel">
+              <div className="executive-panel-heading"><div><span>Next week</span><h3>AI action plan</h3></div><ClipboardList size={18} /></div>
+              <div className="weekly-action-list">
+                {weeklyReport.action_plan.map((action, index) => (
+                  <Link href={action.href} className={`weekly-action priority-${action.priority}`} key={`${action.title}-${index}`}>
+                    <span><strong>{action.title}</strong><small>{action.detail}</small></span>
+                    <ArrowRight size={14} />
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            <section className="weekly-report-panel">
+              <div className="executive-panel-heading"><div><span>Best chances</span><h3>Top opportunities</h3></div><Target size={18} /></div>
+              <div className="weekly-opportunity-list">
+                {weeklyReport.top_opportunities.length ? weeklyReport.top_opportunities.map((item) => (
+                  <Link href={`/dashboard/opportunities?edit=${item.lead_id}`} className="weekly-opportunity" key={item.lead_id}>
+                    <span><strong>{item.name}</strong><small>{item.company || item.next_action}</small></span>
+                    <em>{item.conversion_probability}% · {item.value_label}</em>
+                  </Link>
+                )) : <div className="executive-empty"><Target size={20} /><strong>No ranked opportunities yet</strong><span>Add budget and timeline details to unlock rankings.</span></div>}
+              </div>
+            </section>
+
+            <section className="weekly-report-panel risk-report-panel">
+              <div className="executive-panel-heading"><div><span>Risks</span><h3>Protect the pipeline</h3></div><AlertTriangle size={18} /></div>
+              <div className="weekly-risk-list">
+                {weeklyReport.risks.map((risk, index) => (
+                  <Link href={risk.href} className={`weekly-risk risk-${risk.level}`} key={`${risk.title}-${index}`}>
+                    <span><strong>{risk.title}</strong><small>{risk.detail}</small></span>
+                    <ArrowUpRight size={14} />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </div>
+
 
           <div className="dashboard-insight-grid">
             <section className="pipeline-chart-card">

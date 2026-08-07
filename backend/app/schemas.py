@@ -308,6 +308,74 @@ class RevenueForecastResponse(BaseModel):
     at_risk_leads: list[AtRiskRevenueLead] = Field(default_factory=list)
 
 
+class WeeklyReportMetrics(BaseModel):
+    new_leads: int
+    lead_growth_delta: int
+    updated_leads: int
+    qualified_leads: int
+    won_leads: int
+    appointments_booked: int
+    appointment_delta: int
+    meetings_this_week: int
+    conversations: int
+    conversation_delta: int
+    pipeline_created: int
+    pipeline_created_label: str
+    weighted_forecast: int
+    weighted_forecast_label: str
+    at_risk_value: int
+    at_risk_value_label: str
+    average_score: float
+    conversion_rate: float
+    overdue_follow_ups: int
+    top_source: str
+
+
+class WeeklyReportWin(BaseModel):
+    title: str
+    detail: str
+    metric: str
+
+
+class WeeklyReportRisk(BaseModel):
+    level: str
+    title: str
+    detail: str
+    href: str
+
+
+class WeeklyReportAction(BaseModel):
+    priority: str
+    title: str
+    detail: str
+    href: str
+
+
+class WeeklyReportOpportunity(BaseModel):
+    lead_id: str
+    name: str
+    company: str
+    score: int
+    conversion_probability: int
+    value_label: str
+    next_action: str
+
+
+class WeeklyReportResponse(BaseModel):
+    generated_at: datetime
+    period_start: datetime
+    period_end: datetime
+    headline: str
+    summary: str
+    weekly_velocity: int
+    metrics: WeeklyReportMetrics
+    highlights: list[str] = Field(default_factory=list)
+    wins: list[WeeklyReportWin] = Field(default_factory=list)
+    risks: list[WeeklyReportRisk] = Field(default_factory=list)
+    action_plan: list[WeeklyReportAction] = Field(default_factory=list)
+    top_opportunities: list[WeeklyReportOpportunity] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     session_id: str = Field(min_length=6, max_length=120)
     message: str = Field(min_length=1, max_length=4000)

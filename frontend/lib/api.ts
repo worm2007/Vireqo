@@ -16,6 +16,7 @@ import type {
   User,
   WorkspaceDraftRequest,
   WorkspaceDraftResponse,
+  WeeklyReport,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -267,6 +268,10 @@ export async function getLeadIntelligence(): Promise<LeadIntelligence> {
 
 export async function getRevenueForecast(): Promise<RevenueForecast> {
   return authenticatedRequest<RevenueForecast>("/analytics/revenue-forecast");
+}
+
+export async function getWeeklyReport(): Promise<WeeklyReport> {
+  return authenticatedRequest<WeeklyReport>("/analytics/weekly-report");
 }
 
 export async function getLeads(params: {

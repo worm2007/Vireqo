@@ -157,6 +157,65 @@ export type RevenueForecast = {
   at_risk_leads: AtRiskRevenueLead[];
 };
 
+export type WeeklyReport = {
+  generated_at: string;
+  period_start: string;
+  period_end: string;
+  headline: string;
+  summary: string;
+  weekly_velocity: number;
+  metrics: {
+    new_leads: number;
+    lead_growth_delta: number;
+    updated_leads: number;
+    qualified_leads: number;
+    won_leads: number;
+    appointments_booked: number;
+    appointment_delta: number;
+    meetings_this_week: number;
+    conversations: number;
+    conversation_delta: number;
+    pipeline_created: number;
+    pipeline_created_label: string;
+    weighted_forecast: number;
+    weighted_forecast_label: string;
+    at_risk_value: number;
+    at_risk_value_label: string;
+    average_score: number;
+    conversion_rate: number;
+    overdue_follow_ups: number;
+    top_source: string;
+  };
+  highlights: string[];
+  wins: Array<{
+    title: string;
+    detail: string;
+    metric: string;
+  }>;
+  risks: Array<{
+    level: string;
+    title: string;
+    detail: string;
+    href: string;
+  }>;
+  action_plan: Array<{
+    priority: string;
+    title: string;
+    detail: string;
+    href: string;
+  }>;
+  top_opportunities: Array<{
+    lead_id: string;
+    name: string;
+    company: string;
+    score: number;
+    conversion_probability: number;
+    value_label: string;
+    next_action: string;
+  }>;
+};
+
+
 export type Appointment = {
   id: string;
   lead_id?: string | null;

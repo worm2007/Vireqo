@@ -15,11 +15,13 @@ from ..schemas import (
     LeadPrediction,
     LeadPublic,
     RevenueForecastResponse,
+    WeeklyReportResponse,
 )
 from ..security import get_current_user
 from ..services.executive_insights import build_executive_insights
 from ..services.lead_scoring import calculate_lead_intelligence
 from ..services.revenue_forecast import build_revenue_forecast
+from ..services.weekly_report import build_weekly_report
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -83,6 +85,15 @@ def revenue_forecast(
 ) -> RevenueForecastResponse:
     """Return revenue forecast, weighted pipeline and at-risk opportunity signals."""
     return RevenueForecastResponse.model_validate(build_revenue_forecast(db, current_user))
+
+
+@router.get("/weekly-report", response_model=WeeklyReportResponse)
+def weekly_report(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> WeeklyReportResponse:
+    """Return a weekly executive report with highlights, risks and action plan."""
+    return WeeklyReportResponse.model_validate(build_weekly_report(db, current_user))
 
 
 @router.get("/lead-intelligence", response_model=LeadIntelligenceResponse)
