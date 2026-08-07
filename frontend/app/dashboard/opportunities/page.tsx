@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { PipelineKanban } from "@/components/PipelineKanban";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
@@ -15,6 +16,8 @@ import type { Lead, LeadIntelligence, RevenueForecast } from "@/lib/types";
 import {
   AlertTriangle,
   BrainCircuit,
+  Columns3,
+  ListChecks,
   LoaderCircle,
   Pencil,
   Plus,
@@ -88,6 +91,7 @@ export default function OpportunitiesPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [temperature, setTemperature] = useState("");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
@@ -712,7 +716,7 @@ export default function OpportunitiesPage() {
         </form>
       )}
 
-      <div className="module-toolbar">
+      <div className="module-toolbar opportunities-toolbar">
         <label className="module-search">
           <Search size={16} />
           <input
@@ -743,6 +747,25 @@ export default function OpportunitiesPage() {
           <option value="warm">Warm</option>
           <option value="cold">Cold</option>
         </select>
+
+        <div className="opportunity-view-toggle" aria-label="Opportunity view mode">
+          <button
+            className={viewMode === "kanban" ? "active" : ""}
+            type="button"
+            onClick={() => setViewMode("kanban")}
+          >
+            <Columns3 size={15} />
+            Board
+          </button>
+          <button
+            className={viewMode === "list" ? "active" : ""}
+            type="button"
+            onClick={() => setViewMode("list")}
+          >
+            <ListChecks size={15} />
+            List
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -750,6 +773,14 @@ export default function OpportunitiesPage() {
           <LoaderCircle className="spin" />
           Loading opportunities
         </div>
+      ) : viewMode === "kanban" ? (
+        <PipelineKanban
+          leads={leads}
+          predictionMap={predictionMap}
+          onStatusChange={changeStatus}
+          onEdit={startEditing}
+          onDelete={remove}
+        />
       ) : (
         <div className="module-list">
           {leads.map((lead) => {
