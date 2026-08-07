@@ -1,16 +1,19 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useWorkspaceRealtime, type WorkspaceRealtimeEvent } from "@/hooks/useWorkspaceRealtime";
+import {
+  useWorkspaceRealtime,
+  type WorkspaceRealtimeEvent,
+} from "@/hooks/useWorkspaceRealtime";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
   Bell,
   Bot,
   CalendarDays,
-  ClipboardList,
   ChevronDown,
   CircleUserRound,
+  ClipboardList,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -25,6 +28,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { BrandMark } from "./BrandMark";
+import { CommandCenter } from "./CommandCenter";
 
 const nav = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
@@ -46,9 +50,8 @@ const privilegedManage = [
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [liveEvents, setLiveEvents] = useState<WorkspaceRealtimeEvent[]>([]);
 
   const realtimeStatus = useWorkspaceRealtime((event) => {
@@ -63,18 +66,18 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     [user],
   );
 
-  const commandItems = useMemo(() => [...nav, ...manageItems], [manageItems]);
+  const canViewActivity = Boolean(user && (user.role === "owner" || user.role === "admin"));
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setSearchOpen(true);
+        setCommandOpen(true);
         setNotificationsOpen(false);
       }
 
       if (event.key === "Escape") {
-        setSearchOpen(false);
+        setCommandOpen(false);
         setNotificationsOpen(false);
       }
     };
@@ -84,16 +87,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setSearchOpen(false);
+    setCommandOpen(false);
     setNotificationsOpen(false);
-    setQuery("");
   }, [pathname]);
-
-  const filteredCommands = useMemo(() => {
-    const clean = query.trim().toLowerCase();
-    if (!clean) return commandItems;
-    return commandItems.filter((item) => item.label.toLowerCase().includes(clean));
-  }, [query, commandItems]);
 
   if (loading || !user) {
     return (
@@ -121,7 +117,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
-              <Link className={`dashboard-nav-item ${active ? "active" : ""}`} href={item.href} key={item.href}>
+              <Link
+                className={`dashboard-nav-item ${active ? "active" : ""}`}
+                href={item.href}
+                key={item.href}
+              >
                 <Icon size={18} />
                 <span>{item.label}</span>
                 {active && <i />}
@@ -133,7 +133,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
-              <Link className={`dashboard-nav-item ${active ? "active" : ""}`} href={item.href} key={item.href}>
+              <Link
+                className={`dashboard-nav-item ${active ? "active" : ""}`}
+                href={item.href}
+                key={item.href}
+              >
                 <Icon size={18} />
                 <span>{item.label}</span>
                 {active && <i />}
@@ -166,19 +170,26 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               className="dashboard-search"
               type="button"
               onClick={() => {
-                setSearchOpen(true);
+                setCommandOpen(true);
                 setNotificationsOpen(false);
               }}
-              aria-label="Search your workspace"
+              aria-label="Open Vireqo command center"
             >
               <Search size={17} />
-              <span>Search your workspace</span>
+              <span>Command center</span>
               <kbd>⌘ K</kbd>
             </button>
 
-            <span className={`realtime-status ${realtimeStatus}`} title={`Workspace connection: ${realtimeStatus}`}>
+            <span
+              className={`realtime-status ${realtimeStatus}`}
+              title={`Workspace connection: ${realtimeStatus}`}
+            >
               <i />
-              {realtimeStatus === "live" ? "Live" : realtimeStatus === "connecting" ? "Connecting" : "Reconnecting"}
+              {realtimeStatus === "live"
+                ? "Live Workspace"
+                : realtimeStatus === "connecting"
+                  ? "Connecting"
+                  : "Reconnecting"}
             </span>
 
             <div className="notification-anchor">
@@ -189,7 +200,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 aria-expanded={notificationsOpen}
                 onClick={() => {
                   setNotificationsOpen((current) => !current);
-                  setSearchOpen(false);
+                  setCommandOpen(false);
                 }}
               >
                 <Bell size={18} />
@@ -204,13 +215,29 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                     exit={{ opacity: 0, y: -8, scale: 0.98 }}
                   >
                     <div className="notification-popover-head">
-                      <div><strong>Workspace activity</strong><span>{realtimeStatus === "live" ? "Updating live across every signed-in tab." : "Reconnecting to live updates."}</span></div>
-                      <button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><X size={15} /></button>
+                      <div>
+                        <strong>Workspace activity</strong>
+                        <span>
+                          {realtimeStatus === "live"
+                            ? "Updating live across every signed-in tab."
+                            : "Reconnecting to live updates."}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNotificationsOpen(false)}
+                        aria-label="Close notifications"
+                      >
+                        <X size={15} />
+                      </button>
                     </div>
                     {liveEvents.length > 0 && (
                       <div className="live-event-list">
                         {liveEvents.slice(0, 3).map((event) => (
-                          <div className="live-event-item" key={event.id ?? `${event.type}-${event.occurred_at}`}>
+                          <div
+                            className="live-event-item"
+                            key={event.id ?? `${event.type}-${event.occurred_at}`}
+                          >
                             <span><i /></span>
                             <div>
                               <strong>{formatLiveEvent(event)}</strong>
@@ -230,7 +257,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                       <div><strong>Review appointments</strong><span>Manage upcoming calls and outcomes.</span></div>
                       <ArrowUpRight size={14} />
                     </Link>
-                    {(user.role === "owner" || user.role === "admin") && (
+                    {canViewActivity && (
                       <Link href="/dashboard/activity">
                         <ClipboardList size={17} />
                         <div><strong>Review activity log</strong><span>Inspect recent security and CRM changes.</span></div>
@@ -243,7 +270,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </div>
 
             <span className="user-chip" title={`${user.name} · ${user.role}`}>{initials}</span>
-            <button className="icon-button logout-button" type="button" aria-label="Sign out" onClick={() => void signOut()}>
+            <button
+              className="icon-button logout-button"
+              type="button"
+              aria-label="Sign out"
+              onClick={() => void signOut()}
+            >
               <LogOut size={17} />
             </button>
           </div>
@@ -254,57 +286,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </motion.main>
       </div>
 
-      <AnimatePresence>
-        {searchOpen && (
-          <motion.div
-            className="command-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onMouseDown={() => setSearchOpen(false)}
-          >
-            <motion.section
-              className="command-palette"
-              initial={{ opacity: 0, y: -18, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, scale: 0.98 }}
-              onMouseDown={(event) => event.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Search workspace"
-            >
-              <div className="command-input-wrap">
-                <Search size={18} />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search pages and tools…"
-                />
-                <button type="button" onClick={() => setSearchOpen(false)} aria-label="Close search"><X size={17} /></button>
-              </div>
-
-              <div className="command-results">
-                {filteredCommands.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link href={item.href} key={item.href}>
-                      <span><Icon size={17} /></span>
-                      <div><strong>{item.label}</strong><small>{item.href}</small></div>
-                      <ArrowUpRight size={15} />
-                    </Link>
-                  );
-                })}
-                {filteredCommands.length === 0 && <p>No workspace page matches “{query}”.</p>}
-              </div>
-            </motion.section>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CommandCenter
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        canViewActivity={canViewActivity}
+        workspaceName={user.business.name}
+      />
     </div>
   );
 }
-
 
 function formatLiveEvent(event: WorkspaceRealtimeEvent): string {
   const name = typeof event.payload.name === "string" ? event.payload.name : "Workspace";
