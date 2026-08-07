@@ -5,12 +5,14 @@ import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
   deleteLead,
+  getLeadIntelligence,
   getLeads,
   updateLead,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Lead } from "@/lib/types";
+import type { Lead, LeadIntelligence } from "@/lib/types";
 import {
+  BrainCircuit,
   LoaderCircle,
   Pencil,
   Plus,
@@ -19,7 +21,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const statusOptions: Lead["status"][] = [
@@ -72,6 +74,7 @@ export default function OpportunitiesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [intelligence, setIntelligence] = useState<LeadIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState("");
@@ -92,14 +95,18 @@ export default function OpportunitiesPage() {
     setError("");
 
     try {
-      setLeads(
-        await getLeads({
+      const [items, predictive] = await Promise.all([
+        getLeads({
           search,
           status,
           temperature,
           limit: 500,
         }),
-      );
+        getLeadIntelligence().catch(() => null),
+      ]);
+
+      setLeads(items);
+      setIntelligence(predictive);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load opportunities",
@@ -117,6 +124,10 @@ export default function OpportunitiesPage() {
   useWorkspaceEvent(() => {
     void load(true);
   }, ["lead."]);
+
+  const predictionMap = useMemo(() => {
+    return new Map((intelligence?.predictions ?? []).map((item) => [item.lead_id, item]));
+  }, [intelligence]);
 
   useEffect(() => {
     const requestedLeadId = searchParams.get("edit");
@@ -199,6 +210,11 @@ export default function OpportunitiesPage() {
     }
   }
 
+  const topPrediction = intelligence?.predictions[0] ?? null;
+  const topLead = topPrediction
+    ? leads.find((lead) => lead.id === topPrediction.lead_id)
+    : null;
+
   async function changeStatus(
     lead: Lead,
     nextStatus: Lead["status"],
@@ -275,6 +291,53 @@ export default function OpportunitiesPage() {
 
       {error && <div className="dashboard-alert">{error}</div>}
       {success && <div className="dashboard-success">{success}</div>}
+
+
+      {intelligence && (
+        <section className="predictive-intelligence-strip">
+          <div className="predictive-strip-copy">
+            <span className="dashboard-eyebrow">
+              <i /> Predictive intelligence
+            </span>
+            <h2>Lead scoring and conversion prediction are now active.</h2>
+            <p>{intelligence.summary.recommended_focus}</p>
+          </div>
+
+          <div className="predictive-strip-metrics">
+            <div>
+              <strong>{intelligence.summary.average_score}</strong>
+              <span>avg score</span>
+            </div>
+            <div>
+              <strong>{intelligence.summary.average_conversion_probability}%</strong>
+              <span>avg close chance</span>
+            </div>
+            <div>
+              <strong>{intelligence.summary.high_intent_count}</strong>
+              <span>high intent</span>
+            </div>
+            <div>
+              <strong>{intelligence.summary.at_risk_count}</strong>
+              <span>at risk</span>
+            </div>
+          </div>
+
+          {topLead && topPrediction && (
+            <button
+              className="predictive-best-lead"
+              type="button"
+              onClick={() => startEditing(topLead)}
+            >
+              <BrainCircuit size={17} />
+              <span>
+                <small>Best predicted opportunity</small>
+                <strong>{topLead.name}</strong>
+              </span>
+              <em>{topPrediction.conversion_probability}%</em>
+            </button>
+          )}
+        </section>
+      )}
 
       {showCreate && (
         <form className="dashboard-form-card" onSubmit={submitCreate}>
@@ -636,77 +699,102 @@ export default function OpportunitiesPage() {
         </div>
       ) : (
         <div className="module-list">
-          {leads.map((lead) => (
-            <article
-              className="module-card opportunity-card"
-              key={lead.id}
-            >
-              <div className="module-card-main">
-                <span className={`temperature ${lead.temperature}`}>
-                  <i />
-                  {lead.temperature}
-                </span>
+          {leads.map((lead) => {
+            const prediction = predictionMap.get(lead.id);
+            const score = prediction?.score ?? lead.score;
+            const temperature = prediction?.temperature ?? lead.temperature;
 
-                <h3>{lead.name}</h3>
-
-                <p>
-                  {lead.company ||
-                    lead.email ||
-                    lead.phone ||
-                    "No contact detail"}
-                </p>
-
-                <small>
-                  {lead.need || "No qualification note yet"}
-                </small>
-              </div>
-
-              <div className="opportunity-score">
-                <strong>{lead.score}</strong>
-                <span>intent</span>
-              </div>
-
-              <select
-                value={lead.status}
-                onChange={(event) =>
-                  void changeStatus(
-                    lead,
-                    event.target.value as Lead["status"],
-                  )
-                }
-                aria-label={`Change ${lead.name} status`}
+            return (
+              <article
+                className="module-card opportunity-card predictive-opportunity-card"
+                key={lead.id}
               >
-                {statusOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+                <div className="module-card-main">
+                  <span className={`temperature ${temperature}`}>
+                    <i />
+                    {temperature}
+                  </span>
 
-              <button
-                className="button button-dashboard"
-                type="button"
-                onClick={() => startEditing(lead)}
-                style={{
-                  minHeight: 38,
-                  padding: "0 12px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <Pencil size={15} />
-                Edit
-              </button>
+                  <h3>{lead.name}</h3>
 
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => void remove(lead.id)}
-                aria-label={`Delete ${lead.name}`}
-              >
-                <Trash2 size={16} />
-              </button>
-            </article>
-          ))}
+                  <p>
+                    {lead.company ||
+                      lead.email ||
+                      lead.phone ||
+                      "No contact detail"}
+                  </p>
+
+                  <small>
+                    {lead.need || "No qualification note yet"}
+                  </small>
+
+                  {prediction && (
+                    <div className="lead-prediction-details">
+                      <div>
+                        <strong>{prediction.conversion_label}</strong>
+                        <span>{prediction.next_action}</span>
+                      </div>
+
+                      <div className="lead-prediction-tags">
+                        {prediction.reasons.slice(0, 2).map((reason) => (
+                          <em key={reason}>{reason}</em>
+                        ))}
+                        {prediction.risks.slice(0, 1).map((risk) => (
+                          <em className="risk" key={risk}>{risk}</em>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="opportunity-score predictive-score">
+                  <strong>{score}</strong>
+                  <span>score</span>
+                  <em>{prediction ? `${prediction.conversion_probability}% close` : "predicting"}</em>
+                </div>
+
+                <select
+                  value={lead.status}
+                  onChange={(event) =>
+                    void changeStatus(
+                      lead,
+                      event.target.value as Lead["status"],
+                    )
+                  }
+                  aria-label={`Change ${lead.name} status`}
+                >
+                  {statusOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className="button button-dashboard"
+                  type="button"
+                  onClick={() => startEditing(lead)}
+                  style={{
+                    minHeight: 38,
+                    padding: "0 12px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Pencil size={15} />
+                  Edit
+                </button>
+
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => void remove(lead.id)}
+                  aria-label={`Delete ${lead.name}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </article>
+            );
+          })}
         </div>
       )}
 

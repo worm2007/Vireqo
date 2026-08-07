@@ -192,6 +192,39 @@ class LeadPublic(BaseModel):
     updated_at: datetime
 
 
+
+
+class LeadPrediction(BaseModel):
+    lead_id: str
+    score: int
+    temperature: str
+    conversion_probability: int
+    conversion_label: str
+    confidence: int
+    next_action: str
+    next_action_priority: str
+    reasons: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    signals: dict[str, int] = Field(default_factory=dict)
+    score_breakdown: dict[str, int] = Field(default_factory=dict)
+    estimated_budget_value: int | None = None
+
+
+class LeadIntelligenceSummary(BaseModel):
+    average_score: float
+    average_conversion_probability: float
+    high_intent_count: int
+    at_risk_count: int
+    best_opportunity_id: str | None = None
+    recommended_focus: str
+
+
+class LeadIntelligenceResponse(BaseModel):
+    generated_at: datetime
+    summary: LeadIntelligenceSummary
+    predictions: list[LeadPrediction]
+
+
 class ChatRequest(BaseModel):
     session_id: str = Field(min_length=6, max_length=120)
     message: str = Field(min_length=1, max_length=4000)

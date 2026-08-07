@@ -48,6 +48,36 @@ export type Lead = {
   updated_at: string;
 };
 
+
+export type LeadPrediction = {
+  lead_id: string;
+  score: number;
+  temperature: "hot" | "warm" | "cold";
+  conversion_probability: number;
+  conversion_label: string;
+  confidence: number;
+  next_action: string;
+  next_action_priority: "high" | "medium" | "normal" | string;
+  reasons: string[];
+  risks: string[];
+  signals: Record<string, number>;
+  score_breakdown: Record<string, number>;
+  estimated_budget_value?: number | null;
+};
+
+export type LeadIntelligence = {
+  generated_at: string;
+  summary: {
+    average_score: number;
+    average_conversion_probability: number;
+    high_intent_count: number;
+    at_risk_count: number;
+    best_opportunity_id?: string | null;
+    recommended_focus: string;
+  };
+  predictions: LeadPrediction[];
+};
+
 export type Appointment = {
   id: string;
   lead_id?: string | null;

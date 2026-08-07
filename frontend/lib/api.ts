@@ -10,6 +10,7 @@ import type {
   ExecutiveInsights,
   ForgotPasswordResult,
   Lead,
+  LeadIntelligence,
   TeamMember,
   User,
   WorkspaceDraftRequest,
@@ -257,6 +258,10 @@ export async function getAnalytics(): Promise<Analytics> {
 
 export async function getExecutiveInsights(): Promise<ExecutiveInsights> {
   return authenticatedRequest<ExecutiveInsights>("/analytics/insights");
+}
+
+export async function getLeadIntelligence(): Promise<LeadIntelligence> {
+  return authenticatedRequest<LeadIntelligence>("/analytics/lead-intelligence");
 }
 
 export async function getLeads(params: {
