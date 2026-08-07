@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Business, Conversation, Lead, Message, User
-from ..schemas import ChatHistoryResponse, ChatRequest, ChatResponse
+from ..schemas import ChatHistoryResponse, ChatRequest, ChatResponse, WorkspaceDraftRequest, WorkspaceDraftResponse
 from ..security import get_current_user
 from ..services.ai import generate_reply
 from ..services.ai_actions import try_workspace_action
+from ..services.audit import record_audit
+from ..services.drafts import generate_workspace_draft
 from ..services.lead_scoring import calculate_lead_score
 from ..services.realtime import workspace_events
 
@@ -145,6 +147,65 @@ def workspace_history(
             if item.role in {"user", "assistant"}
         ],
         memory_label=conversation.lead.name if conversation.lead else None,
+    )
+
+
+@router.post("/workspace/draft", response_model=WorkspaceDraftResponse)
+async def workspace_draft(
+    payload: WorkspaceDraftRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> WorkspaceDraftResponse:
+    business = current_user.business
+    if business is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    recent_leads = db.scalars(
+        select(Lead)
+        .where(Lead.business_id == business.id)
+        .order_by(Lead.updated_at.desc())
+        .limit(5)
+    ).all()
+    workspace_context = "\n".join(
+        f"Lead: {lead.name}; Company: {lead.company or 'Not provided'}; Status: {lead.status}; Temperature: {lead.temperature}; Need: {lead.need[:160] or 'Not provided'}"
+        for lead in recent_leads
+    )
+
+    draft = await generate_workspace_draft(
+        business=business,
+        draft_type=payload.draft_type,
+        recipient=payload.recipient,
+        context=payload.context,
+        goal=payload.goal,
+        tone=payload.tone,
+        workspace_context=workspace_context,
+    )
+
+    record_audit(
+        db,
+        action="ai.draft.generated",
+        user=current_user,
+        entity_type="ai_draft",
+        details={
+            "draft_type": draft.draft_type,
+            "recipient": payload.recipient,
+            "tone": payload.tone,
+        },
+        request=request,
+    )
+    db.commit()
+    workspace_events.publish(
+        business.id,
+        "ai.draft.generated",
+        {"label": "AI draft generated", "draft_type": draft.draft_type},
+    )
+
+    return WorkspaceDraftResponse(
+        draft=draft.draft,
+        subject=draft.subject,
+        draft_type=draft.draft_type,
+        suggestions=draft.suggestions,
     )
 
 

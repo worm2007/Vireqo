@@ -12,6 +12,8 @@ import type {
   Lead,
   TeamMember,
   User,
+  WorkspaceDraftRequest,
+  WorkspaceDraftResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -401,6 +403,15 @@ export async function sendWorkspaceChat(payload: {
   message: string;
 }): Promise<ChatResponse> {
   return authenticatedRequest<ChatResponse>("/chat/workspace/assistant", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function generateWorkspaceDraft(
+  payload: WorkspaceDraftRequest,
+): Promise<WorkspaceDraftResponse> {
+  return authenticatedRequest<WorkspaceDraftResponse>("/chat/workspace/draft", {
     method: "POST",
     body: JSON.stringify(payload),
   });

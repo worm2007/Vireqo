@@ -224,6 +224,26 @@ class ChatHistoryResponse(BaseModel):
     memory_label: str | None = None
 
 
+class WorkspaceDraftRequest(BaseModel):
+    draft_type: str = Field(default="follow_up_email", max_length=80)
+    recipient: str = Field(default="", max_length=160)
+    context: str = Field(default="", max_length=4000)
+    goal: str = Field(default="", max_length=1200)
+    tone: str = Field(default="professional", max_length=80)
+
+    @field_validator("draft_type", "recipient", "context", "goal", "tone")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class WorkspaceDraftResponse(BaseModel):
+    draft: str
+    subject: str | None = None
+    draft_type: str
+    suggestions: list[str] = []
+
+
 class MessagePublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

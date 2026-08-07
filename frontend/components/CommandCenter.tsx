@@ -1,7 +1,11 @@
 "use client";
 
 import { sendWorkspaceChat } from "@/lib/api";
-import type { ChatResponse } from "@/lib/types";
+import { pushCommandHistory } from "@/lib/commandHistory";
+import type { ChatResponse, CommandHistoryEntry } from "@/lib/types";
+import { AIHistoryPanel } from "./AIHistoryPanel";
+import { DraftStudio } from "./DraftStudio";
+import { SmartSuggestions, type SmartSuggestion } from "./SmartSuggestions";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -14,11 +18,13 @@ import {
   Copy,
   FileText,
   Flame,
+  History,
   LayoutDashboard,
   LoaderCircle,
   MessageSquareText,
   Mic,
   MicOff,
+  PenLine,
   Plus,
   Radio,
   Search,
@@ -42,6 +48,7 @@ const RECENT_COMMANDS_KEY = "vireqo-command-center-recents";
 const COMMAND_SESSION_KEY = "vireqo-command-center-session";
 
 type CommandIntent = "navigate" | "ai" | "prefill";
+type CommandMode = "commands" | "draft" | "history";
 
 type CommandItem = {
   id: string;
@@ -322,6 +329,9 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
   const [result, setResult] = useState<ChatResponse | null>(null);
   const [error, setError] = useState("");
   const [recents, setRecents] = useState<RecentCommand[]>([]);
+  const [activeMode, setActiveMode] = useState<CommandMode>("commands");
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [draftSeed, setDraftSeed] = useState("");
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
@@ -405,7 +415,12 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
     if (!listening) setVoiceError("");
   }, [query, listening]);
 
-  function remember(title: string, description: string) {
+  function remember(
+    title: string,
+    description: string,
+    kind: CommandHistoryEntry["kind"] = "command",
+    preview?: string,
+  ) {
     const next = [
       {
         id: crypto.randomUUID(),
@@ -417,6 +432,14 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
     ].slice(0, 6);
     setRecents(next);
     saveRecentCommands(next);
+    pushCommandHistory({
+      title,
+      description,
+      kind,
+      status: "completed",
+      preview,
+    });
+    setHistoryVersion((version) => version + 1);
   }
 
   function close() {
@@ -428,6 +451,7 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
     setSelectedIndex(0);
     setResult(null);
     setError("");
+    setActiveMode("commands");
     onClose();
   }
 
@@ -445,9 +469,18 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
         message: clean,
       });
       setResult(response);
-      remember(title, clean);
+      remember(title, clean, title === "Voice command" ? "voice" : "command", response.reply.slice(0, 220));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Vireqo could not complete that command.");
+      const message = err instanceof Error ? err.message : "Vireqo could not complete that command.";
+      setError(message);
+      pushCommandHistory({
+        title: `${title} failed`,
+        description: clean,
+        kind: title === "Voice command" ? "voice" : "command",
+        status: "failed",
+        preview: message,
+      });
+      setHistoryVersion((version) => version + 1);
     } finally {
       setLoading(false);
     }
@@ -455,7 +488,7 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
 
   function execute(command: CommandItem) {
     if (command.intent === "navigate" && command.href) {
-      remember(command.title, command.description);
+      remember(command.title, command.description, "navigation");
       router.push(command.href);
       close();
       return;
@@ -570,6 +603,27 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
     }
   }
 
+  function handleSmartSuggestion(suggestion: SmartSuggestion) {
+    if (suggestion.kind === "draft") {
+      setDraftSeed(suggestion.prompt);
+      setActiveMode("draft");
+      return;
+    }
+
+    setQuery(suggestion.prompt);
+    window.setTimeout(() => inputRef.current?.focus(), 20);
+  }
+
+  function handleHistoryChange() {
+    setHistoryVersion((version) => version + 1);
+  }
+
+  function handleUseHistoryCommand(value: string) {
+    setActiveMode("commands");
+    setQuery(value);
+    window.setTimeout(() => inputRef.current?.focus(), 20);
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -636,163 +690,209 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
               </button>
             </div>
 
-            <div className="command-center-input">
-              <Search size={18} />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={listening ? "Listening for a Vireqo command…" : "Search pages or ask Vireqo AI…"}
-                aria-label="Search pages or ask Vireqo AI"
-              />
+            <div className="command-center-tabs">
               <button
                 type="button"
-                className={`command-voice-button ${listening ? "listening" : ""}`}
-                onClick={toggleVoiceCommand}
-                disabled={!voiceSupported || loading}
-                title={
-                  voiceSupported
-                    ? listening
-                      ? "Stop voice command"
-                      : "Speak a Vireqo command"
-                    : "Voice commands are not supported in this browser"
-                }
-                aria-label={listening ? "Stop voice command" : "Speak a Vireqo command"}
+                className={activeMode === "commands" ? "active" : ""}
+                onClick={() => setActiveMode("commands")}
               >
-                {listening ? <MicOff size={16} /> : <Mic size={16} />}
+                <Command size={14} /> Commands
               </button>
-              <kbd>Enter</kbd>
+              <button
+                type="button"
+                className={activeMode === "draft" ? "active" : ""}
+                onClick={() => setActiveMode("draft")}
+              >
+                <PenLine size={14} /> Draft Studio
+              </button>
+              <button
+                type="button"
+                className={activeMode === "history" ? "active" : ""}
+                onClick={() => setActiveMode("history")}
+              >
+                <History size={14} /> AI History
+              </button>
             </div>
 
-            {(listening || voiceTranscript || voiceError) && (
-              <div className={`command-voice-strip ${voiceError ? "error" : listening ? "listening" : ""}`}>
-                <Radio size={14} />
-                <span>
-                  {voiceError ||
-                    (listening
-                      ? `Listening: ${voiceTranscript}`
-                      : `Heard: ${voiceTranscript}`)}
-                </span>
-              </div>
-            )}
-
-            <div className="command-center-body">
-              <div className="command-center-results">
-                {!cleanQuery && (
-                  <div className="command-center-empty-state">
-                    <Sparkles size={18} />
-                    <div>
-                      <strong>What would you like Vireqo to do?</strong>
-                      <span>Navigate, create leads, schedule meetings or ask AI from one place.</span>
-                    </div>
-                  </div>
-                )}
-
-                {filteredCommands.map((item, index) => {
-                  const Icon = item.icon;
-                  const selected = index === selectedIndex;
-                  return (
-                    <button
-                      type="button"
-                      key={`${item.id}-${item.prompt ?? item.href ?? item.template ?? ""}`}
-                      className={`command-center-item ${selected ? "selected" : ""}`}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      onClick={() => execute(item)}
-                    >
-                      <span><Icon size={17} /></span>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <small>{item.description}</small>
-                      </div>
-                      <ArrowRight size={15} />
-                    </button>
-                  );
-                })}
-
-                {filteredCommands.length === 0 && (
+            {activeMode === "commands" && (
+              <>
+                <div className="command-center-input">
+                  <Search size={18} />
+                  <input
+                    ref={inputRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={listening ? "Listening for a Vireqo command…" : "Search pages or ask Vireqo AI…"}
+                    aria-label="Search pages or ask Vireqo AI"
+                  />
                   <button
                     type="button"
-                    className="command-center-item selected"
-                    onClick={() => void runAi(cleanQuery, "Ask Vireqo AI")}
+                    className={`command-voice-button ${listening ? "listening" : ""}`}
+                    onClick={toggleVoiceCommand}
+                    disabled={!voiceSupported || loading}
+                    title={
+                      voiceSupported
+                        ? listening
+                          ? "Stop voice command"
+                          : "Speak a Vireqo command"
+                        : "Voice commands are not supported in this browser"
+                    }
+                    aria-label={listening ? "Stop voice command" : "Speak a Vireqo command"}
                   >
-                    <span><Sparkles size={17} /></span>
-                    <div>
-                      <strong>Ask Vireqo AI</strong>
-                      <small>{cleanQuery}</small>
-                    </div>
-                    <ArrowRight size={15} />
+                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
                   </button>
-                )}
-              </div>
+                  <kbd>Enter</kbd>
+                </div>
 
-              <aside className="command-center-side">
-                {loading && (
-                  <div className="command-center-status">
-                    <LoaderCircle className="spin" size={18} />
-                    <strong>Running command</strong>
-                    <span>Vireqo is checking your workspace and applying safe CRM actions.</span>
+                {(listening || voiceTranscript || voiceError) && (
+                  <div className={`command-voice-strip ${voiceError ? "error" : listening ? "listening" : ""}`}>
+                    <Radio size={14} />
+                    <span>
+                      {voiceError ||
+                        (listening
+                          ? `Listening: ${voiceTranscript}`
+                          : `Heard: ${voiceTranscript}`)}
+                    </span>
                   </div>
                 )}
 
-                {error && (
-                  <div className="command-center-error">
-                    <strong>Command failed</strong>
-                    <span>{error}</span>
-                  </div>
-                )}
+                <SmartSuggestions query={query} onSelect={handleSmartSuggestion} />
 
-                {result && (
-                  <div className="command-center-result">
-                    <div className="command-center-result-head">
-                      <CheckCircle2 size={18} />
-                      <div>
-                        <strong>{result.action_label ?? "AI response ready"}</strong>
-                        <span>{result.memory_label ? `Remembering: ${result.memory_label}` : "Workspace command completed"}</span>
+                <div className="command-center-body">
+                  <div className="command-center-results">
+                    {!cleanQuery && (
+                      <div className="command-center-empty-state">
+                        <Sparkles size={18} />
+                        <div>
+                          <strong>What would you like Vireqo to do?</strong>
+                          <span>Navigate, create leads, schedule meetings or ask AI from one place.</span>
+                        </div>
                       </div>
-                    </div>
-                    <p>{result.reply}</p>
-                    <div className="command-center-result-actions">
-                      <button type="button" onClick={copyResult}><Copy size={14} /> Copy</button>
-                      <button type="button" onClick={() => { router.push(actionHref(result)); close(); }}>
-                        Open related page
-                      </button>
-                    </div>
-                  </div>
-                )}
+                    )}
 
-                {!loading && !result && !error && (
-                  <div className="command-center-hint-card">
-                    <Bot size={18} />
-                    <strong>Try a natural command</strong>
-                    <span>Type or speak: create a lead for Rahul, show hot leads, or schedule Maya tomorrow at 3 PM.</span>
-                  </div>
-                )}
+                    {filteredCommands.map((item, index) => {
+                      const Icon = item.icon;
+                      const selected = index === selectedIndex;
+                      return (
+                        <button
+                          type="button"
+                          key={`${item.id}-${item.prompt ?? item.href ?? item.template ?? ""}`}
+                          className={`command-center-item ${selected ? "selected" : ""}`}
+                          onMouseEnter={() => setSelectedIndex(index)}
+                          onClick={() => execute(item)}
+                        >
+                          <span><Icon size={17} /></span>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <small>{item.description}</small>
+                          </div>
+                          <ArrowRight size={15} />
+                        </button>
+                      );
+                    })}
 
-                {!voiceSupported && (
-                  <div className="command-center-voice-note">
-                    <MicOff size={15} />
-                    <span>Voice commands are unavailable in this browser. Chrome usually supports them best.</span>
-                  </div>
-                )}
-
-                {recents.length > 0 && (
-                  <div className="command-center-recents">
-                    <span>Recent</span>
-                    {recents.slice(0, 4).map((item) => (
+                    {filteredCommands.length === 0 && (
                       <button
                         type="button"
-                        key={item.id}
-                        onClick={() => setQuery(item.description)}
+                        className="command-center-item selected"
+                        onClick={() => void runAi(cleanQuery, "Ask Vireqo AI")}
                       >
-                        <strong>{item.title}</strong>
-                        <small>{item.description}</small>
+                        <span><Sparkles size={17} /></span>
+                        <div>
+                          <strong>Ask Vireqo AI</strong>
+                          <small>{cleanQuery}</small>
+                        </div>
+                        <ArrowRight size={15} />
                       </button>
-                    ))}
+                    )}
                   </div>
-                )}
-              </aside>
-            </div>
+
+                  <aside className="command-center-side">
+                    {loading && (
+                      <div className="command-center-status">
+                        <LoaderCircle className="spin" size={18} />
+                        <strong>Running command</strong>
+                        <span>Vireqo is checking your workspace and applying safe CRM actions.</span>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="command-center-error">
+                        <strong>Command failed</strong>
+                        <span>{error}</span>
+                      </div>
+                    )}
+
+                    {result && (
+                      <div className="command-center-result">
+                        <div className="command-center-result-head">
+                          <CheckCircle2 size={18} />
+                          <div>
+                            <strong>{result.action_label ?? "AI response ready"}</strong>
+                            <span>{result.memory_label ? `Remembering: ${result.memory_label}` : "Workspace command completed"}</span>
+                          </div>
+                        </div>
+                        <p>{result.reply}</p>
+                        <div className="command-center-result-actions">
+                          <button type="button" onClick={copyResult}><Copy size={14} /> Copy</button>
+                          <button type="button" onClick={() => { router.push(actionHref(result)); close(); }}>
+                            Open related page
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!loading && !result && !error && (
+                      <div className="command-center-hint-card">
+                        <Bot size={18} />
+                        <strong>Try a natural command</strong>
+                        <span>Type or speak: create a lead for Rahul, show hot leads, or schedule Maya tomorrow at 3 PM.</span>
+                      </div>
+                    )}
+
+                    {!voiceSupported && (
+                      <div className="command-center-voice-note">
+                        <MicOff size={15} />
+                        <span>Voice commands are unavailable in this browser. Chrome usually supports them best.</span>
+                      </div>
+                    )}
+
+                    {recents.length > 0 && (
+                      <div className="command-center-recents">
+                        <span>Recent</span>
+                        {recents.slice(0, 4).map((item) => (
+                          <button
+                            type="button"
+                            key={item.id}
+                            onClick={() => setQuery(item.description)}
+                          >
+                            <strong>{item.title}</strong>
+                            <small>{item.description}</small>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </aside>
+                </div>
+              </>
+            )}
+
+            {activeMode === "draft" && (
+              <DraftStudio
+                key={draftSeed}
+                initialPrompt={draftSeed || query}
+                onHistoryChange={handleHistoryChange}
+              />
+            )}
+
+            {activeMode === "history" && (
+              <AIHistoryPanel
+                version={historyVersion}
+                onUseCommand={handleUseHistoryCommand}
+              />
+            )}
+
 
             <div className="command-center-footer">
               <span>↑ ↓ to navigate</span>

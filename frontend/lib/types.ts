@@ -174,3 +174,28 @@ export type AuditLog = {
   created_at: string;
 };
 
+
+export type WorkspaceDraftRequest = {
+  draft_type: string;
+  recipient?: string;
+  context?: string;
+  goal?: string;
+  tone?: string;
+};
+
+export type WorkspaceDraftResponse = {
+  draft: string;
+  subject?: string | null;
+  draft_type: string;
+  suggestions: string[];
+};
+
+export type CommandHistoryEntry = {
+  id: string;
+  title: string;
+  description: string;
+  kind: "command" | "draft" | "voice" | "navigation";
+  status: "completed" | "failed" | "started";
+  createdAt: string;
+  preview?: string;
+};
