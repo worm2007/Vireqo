@@ -17,7 +17,10 @@ import {
   LayoutDashboard,
   LoaderCircle,
   MessageSquareText,
+  Mic,
+  MicOff,
   Plus,
+  Radio,
   Search,
   Settings2,
   Sparkles,
@@ -58,6 +61,37 @@ type RecentCommand = {
   description: string;
   createdAt: string;
 };
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+};
+
+type SpeechRecognitionResultEventLike = {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      0: { transcript: string };
+    };
+  };
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  }
+}
 
 type CommandCenterProps = {
   open: boolean;
@@ -189,6 +223,59 @@ const quickActions: CommandItem[] = [
   },
 ];
 
+function normalizeVoiceCommand(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[.,!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function spokenMatchesCommand(spoken: string, command: CommandItem): boolean {
+  const normalized = normalizeVoiceCommand(spoken);
+  const title = command.title.toLowerCase();
+  const relaxedTitle = title
+    .replace(/^open\s+/, "")
+    .replace(/^show\s+/, "")
+    .replace(/^summarize\s+/, "")
+    .trim();
+
+  if (normalized === title || normalized === relaxedTitle) return true;
+
+  if (command.intent === "prefill") {
+    return false;
+  }
+
+  const isNavigationPhrase = /^(open|go to|show|show me|take me to|navigate to)\b/.test(normalized);
+
+  if (command.intent === "navigate" && !isNavigationPhrase) {
+    return false;
+  }
+
+  if (normalized.includes(title) || normalized.includes(relaxedTitle)) return true;
+
+  return command.keywords.some((keyword) => {
+    const cleanKeyword = keyword.toLowerCase();
+    return cleanKeyword.length > 2 && normalized.includes(cleanKeyword);
+  });
+}
+
+function voiceErrorMessage(error?: string): string {
+  if (error === "not-allowed" || error === "service-not-allowed") {
+    return "Microphone access was blocked. Allow microphone permission in the browser and try again.";
+  }
+
+  if (error === "no-speech") {
+    return "No speech was detected. Try again and speak clearly after the listening indicator appears.";
+  }
+
+  if (error === "network") {
+    return "Voice recognition could not reach the browser speech service. Check your internet connection.";
+  }
+
+  return "Voice command could not be processed. Type the command or try speaking again.";
+}
+
 function getSessionId(): string {
   if (typeof window === "undefined") return `command-${crypto.randomUUID()}`;
   const stored = window.localStorage.getItem(COMMAND_SESSION_KEY);
@@ -227,12 +314,18 @@ function actionHref(response: ChatResponse): string {
 export function CommandCenter({ open, onClose, canViewActivity, workspaceName }: CommandCenterProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const finalVoiceCommandRef = useRef("");
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ChatResponse | null>(null);
   const [error, setError] = useState("");
   const [recents, setRecents] = useState<RecentCommand[]>([]);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
 
   const commands = useMemo(() => {
     const activity: CommandItem[] = canViewActivity
@@ -250,6 +343,26 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
       : [];
     return [...quickActions, ...baseNavigation, ...activity];
   }, [canViewActivity]);
+
+  useEffect(() => {
+    setVoiceSupported(
+      typeof window !== "undefined" &&
+        Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
+    );
+
+    return () => {
+      recognitionRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      recognitionRef.current?.abort();
+      setListening(false);
+      setVoiceError("");
+      setVoiceTranscript("");
+    }
+  }, [open]);
 
   const cleanQuery = query.trim();
 
@@ -289,7 +402,8 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
     setSelectedIndex(0);
     setResult(null);
     setError("");
-  }, [query]);
+    if (!listening) setVoiceError("");
+  }, [query, listening]);
 
   function remember(title: string, description: string) {
     const next = [
@@ -306,6 +420,10 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
   }
 
   function close() {
+    recognitionRef.current?.abort();
+    setListening(false);
+    setVoiceTranscript("");
+    setVoiceError("");
     setQuery("");
     setSelectedIndex(0);
     setResult(null);
@@ -351,6 +469,104 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
 
     if (command.intent === "ai" && command.prompt) {
       void runAi(command.prompt, command.title);
+    }
+  }
+
+  function executeSpokenCommand(spoken: string) {
+    const clean = spoken.trim();
+    if (!clean || loading) return;
+
+    const directMatch = commands.find((command) => spokenMatchesCommand(clean, command));
+
+    if (directMatch) {
+      execute(directMatch);
+      return;
+    }
+
+    void runAi(clean, "Voice command");
+  }
+
+  function startVoiceCommand() {
+    if (!voiceSupported || loading || typeof window === "undefined") return;
+
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceSupported(false);
+      setVoiceError("Voice commands are not supported in this browser. Use Chrome or type the command.");
+      return;
+    }
+
+    recognitionRef.current?.abort();
+    finalVoiceCommandRef.current = "";
+    setVoiceError("");
+    setVoiceTranscript("");
+
+    const recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setListening(true);
+      setVoiceError("");
+      setVoiceTranscript("Listening...");
+    };
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      let final = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const speechResult = event.results[index];
+        const transcript = speechResult[0]?.transcript ?? "";
+
+        if (speechResult.isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+
+      const spoken = (final || interim).trim();
+      if (spoken) {
+        setQuery(spoken);
+        setVoiceTranscript(spoken);
+      }
+
+      if (final.trim()) {
+        finalVoiceCommandRef.current = final.trim();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      setVoiceError(voiceErrorMessage(event.error));
+      setListening(false);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+      const finalCommand = finalVoiceCommandRef.current.trim();
+      finalVoiceCommandRef.current = "";
+
+      if (finalCommand.length >= 3) {
+        window.setTimeout(() => executeSpokenCommand(finalCommand), 180);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }
+
+  function stopVoiceCommand() {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }
+
+  function toggleVoiceCommand() {
+    if (listening) {
+      stopVoiceCommand();
+    } else {
+      startVoiceCommand();
     }
   }
 
@@ -427,11 +643,39 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search pages or ask Vireqo AI…"
+                placeholder={listening ? "Listening for a Vireqo command…" : "Search pages or ask Vireqo AI…"}
                 aria-label="Search pages or ask Vireqo AI"
               />
+              <button
+                type="button"
+                className={`command-voice-button ${listening ? "listening" : ""}`}
+                onClick={toggleVoiceCommand}
+                disabled={!voiceSupported || loading}
+                title={
+                  voiceSupported
+                    ? listening
+                      ? "Stop voice command"
+                      : "Speak a Vireqo command"
+                    : "Voice commands are not supported in this browser"
+                }
+                aria-label={listening ? "Stop voice command" : "Speak a Vireqo command"}
+              >
+                {listening ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
               <kbd>Enter</kbd>
             </div>
+
+            {(listening || voiceTranscript || voiceError) && (
+              <div className={`command-voice-strip ${voiceError ? "error" : listening ? "listening" : ""}`}>
+                <Radio size={14} />
+                <span>
+                  {voiceError ||
+                    (listening
+                      ? `Listening: ${voiceTranscript}`
+                      : `Heard: ${voiceTranscript}`)}
+                </span>
+              </div>
+            )}
 
             <div className="command-center-body">
               <div className="command-center-results">
@@ -521,7 +765,14 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
                   <div className="command-center-hint-card">
                     <Bot size={18} />
                     <strong>Try a natural command</strong>
-                    <span>Create a lead for Rahul, show hot leads, or schedule Maya tomorrow at 3 PM.</span>
+                    <span>Type or speak: create a lead for Rahul, show hot leads, or schedule Maya tomorrow at 3 PM.</span>
+                  </div>
+                )}
+
+                {!voiceSupported && (
+                  <div className="command-center-voice-note">
+                    <MicOff size={15} />
+                    <span>Voice commands are unavailable in this browser. Chrome usually supports them best.</span>
                   </div>
                 )}
 
@@ -546,6 +797,7 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
             <div className="command-center-footer">
               <span>↑ ↓ to navigate</span>
               <span>Enter to run</span>
+              <span>Mic to speak</span>
               <span>Esc to close</span>
             </div>
           </motion.section>

@@ -2834,3 +2834,120 @@ button { cursor: pointer; }
     white-space: normal;
   }
 }
+
+/* ========================================================================== 
+   Sprint 2.3.2 — Voice commands for Command Center
+   ========================================================================== */
+.command-center-input {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.command-voice-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(17, 17, 15, 0.08);
+  border-bottom-color: rgba(17, 17, 15, 0.18);
+  border-radius: 12px;
+  background: #eef2e4;
+  color: var(--forest);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.command-voice-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--forest);
+  color: var(--lime);
+  box-shadow: 0 10px 24px rgba(18, 66, 49, 0.16);
+}
+
+.command-voice-button.listening {
+  background: var(--forest);
+  color: var(--lime);
+  box-shadow: 0 0 0 6px rgba(186, 255, 45, 0.16), 0 14px 30px rgba(18, 66, 49, 0.22);
+  animation: vireqoVoicePulse 1.25s ease-in-out infinite;
+}
+
+.command-voice-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.command-voice-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(17, 17, 15, 0.08);
+  background: linear-gradient(90deg, #f3f8e8, rgba(255, 255, 255, 0.68));
+  color: var(--forest);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.command-voice-strip svg {
+  flex: 0 0 auto;
+}
+
+.command-voice-strip.listening svg {
+  color: #77ad1e;
+  animation: vireqoVoicePulse 1.25s ease-in-out infinite;
+}
+
+.command-voice-strip.error {
+  background: #fff3ef;
+  color: #9a4a37;
+}
+
+.command-center-voice-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(154, 74, 55, 0.12);
+  border-radius: 14px;
+  background: #fff7f4;
+  color: #92513f;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.command-center-voice-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+@keyframes vireqoVoicePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 560px) {
+  .command-center-input {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .command-center-input kbd {
+    display: none;
+  }
+
+  .command-voice-button {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .command-voice-strip {
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+}
