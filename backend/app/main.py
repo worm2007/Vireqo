@@ -23,14 +23,14 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     description="Authentication, CRM, conversations, appointments and analytics APIs for Vireqo.",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://127.0.0.1:3000"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,9 +52,20 @@ app.include_router(realtime.router, prefix="/api/v1")
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"name": "Vireqo API", "status": "online", "version": "0.3.0", "docs": "/docs"}
+    return {
+        "name": "Vireqo API",
+        "status": "online",
+        "environment": settings.environment,
+        "version": "0.4.0",
+        "docs": "/docs",
+    }
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "healthy", "environment": settings.environment, "version": "0.3.0", "database": "sqlite" if settings.is_sqlite else "postgresql"}
+    return {
+        "status": "healthy",
+        "environment": settings.environment,
+        "version": "0.4.0",
+        "database": "sqlite" if settings.is_sqlite else "postgresql",
+    }

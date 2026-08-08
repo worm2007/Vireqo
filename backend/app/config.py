@@ -15,13 +15,19 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _split_csv(value: str) -> list[str]:
+    return [item.strip().rstrip("/") for item in value.split(",") if item.strip()]
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "Vireqo API")
     environment: str = os.getenv("ENVIRONMENT", "development")
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-change-before-production")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./vireqo.db")
-    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    backend_public_url: str = os.getenv("BACKEND_PUBLIC_URL", "http://localhost:8000").rstrip("/")
+    cors_origins: str = os.getenv("CORS_ORIGINS", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "30"))
@@ -40,8 +46,19 @@ class Settings:
         return self.environment.lower() in {"development", "dev", "local", "test"}
 
     @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in {"production", "prod"}
+
+    @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        origins = [self.frontend_url, "http://127.0.0.1:3000"]
+        origins.extend(_split_csv(self.cors_origins))
+        # Preserve order while removing duplicates.
+        return list(dict.fromkeys(origin for origin in origins if origin))
 
     @property
     def should_auto_create_tables(self) -> bool:
