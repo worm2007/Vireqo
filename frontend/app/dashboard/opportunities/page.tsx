@@ -4,6 +4,14 @@ import { DashboardShell } from "@/components/DashboardShell";
 import { DealDetailDrawer } from "@/components/DealDetailDrawer";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { PipelineAutomationPanel } from "@/components/PipelineAutomationPanel";
+import {
+  BulkActionBar,
+  ConfirmDialog,
+  EmptyState,
+  LoadingSkeleton,
+  ToastStack,
+  type PolishToast,
+} from "@/components/PolishKit";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
@@ -21,9 +29,13 @@ import type { Lead, LeadDetail, LeadIntelligence, PipelineAutomation, PipelineAu
 import {
   AlertTriangle,
   BrainCircuit,
+  CheckSquare,
   Columns3,
+  Download,
   Eye,
+  FileUp,
   ListChecks,
+  Square,
   LoaderCircle,
   Pencil,
   Plus,
@@ -34,7 +46,8 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const statusOptions: Lead["status"][] = [
@@ -67,6 +80,55 @@ const emptyCreateForm = {
   need: "",
 };
 
+const csvColumns = [
+  "name",
+  "email",
+  "phone",
+  "company",
+  "need",
+  "budget",
+  "timeline",
+  "source",
+  "status",
+  "notes",
+] as const;
+
+function escapeCsv(value: unknown) {
+  const text = String(value ?? "");
+  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function parseCsvLine(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    const next = line[index + 1];
+
+    if (character === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function validLeadStatus(value: string): value is Lead["status"] {
+  return statusOptions.includes(value as Lead["status"]);
+}
+
 function leadToForm(lead: Lead): LeadForm {
   return {
     name: lead.name ?? "",
@@ -95,6 +157,13 @@ export default function OpportunitiesPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [toasts, setToasts] = useState<PolishToast[]>([]);
+  const [confirmDeleteLead, setConfirmDeleteLead] = useState<Lead | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<Lead["status"]>("contacted");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [temperature, setTemperature] = useState("");
@@ -111,6 +180,18 @@ export default function OpportunitiesPage() {
   const [leadDetail, setLeadDetail] = useState<LeadDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+
+  function notify(tone: PolishToast["tone"], title: string, message?: string) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [{ id, tone, title, message }, ...current].slice(0, 4));
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 5200);
+  }
+
+  function dismissToast(id: string) {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }
 
   async function load(silent = false) {
     if (!silent) setLoading(true);
@@ -186,6 +267,26 @@ export default function OpportunitiesPage() {
     return new Map((intelligence?.predictions ?? []).map((item) => [item.lead_id, item]));
   }, [intelligence]);
 
+  const visibleLeadIds = useMemo(() => leads.map((lead) => lead.id), [leads]);
+  const allVisibleSelected = visibleLeadIds.length > 0 && visibleLeadIds.every((id) => selectedLeadIds.includes(id));
+
+  function toggleLeadSelection(id: string) {
+    setSelectedLeadIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedLeadIds((current) => {
+      if (allVisibleSelected) return current.filter((id) => !visibleLeadIds.includes(id));
+      return Array.from(new Set([...current, ...visibleLeadIds]));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedLeadIds([]);
+  }
+
   useEffect(() => {
     const requestedLeadId = searchParams.get("edit");
     if (loading || !requestedLeadId || editingLeadId === requestedLeadId) return;
@@ -223,6 +324,7 @@ export default function OpportunitiesPage() {
       setCreateForm(emptyCreateForm);
       setShowCreate(false);
       setSuccess("Opportunity created successfully.");
+      notify("success", "Opportunity created", `${lead.name} was added to your pipeline.`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to create opportunity",
@@ -269,6 +371,7 @@ export default function OpportunitiesPage() {
       setEditingLeadId(null);
       setEditForm(null);
       setSuccess("Opportunity updated successfully.");
+      notify("success", "Opportunity updated", "The qualification details were saved.");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to update opportunity",
@@ -316,18 +419,27 @@ export default function OpportunitiesPage() {
         ),
       );
       setError("Unable to update opportunity status.");
+      notify("error", "Stage update failed", "The opportunity was returned to its previous stage.");
     }
   }
 
-  async function remove(id: string) {
-    if (!window.confirm("Delete this opportunity permanently?")) return;
+  function requestRemove(id: string) {
+    const lead = leads.find((item) => item.id === id);
+    if (lead) setConfirmDeleteLead(lead);
+  }
+
+  async function confirmRemove() {
+    if (!confirmDeleteLead) return;
+    const id = confirmDeleteLead.id;
 
     setError("");
     setSuccess("");
+    setBulkWorking(true);
 
     try {
       await deleteLead(id);
       setLeads((current) => current.filter((item) => item.id !== id));
+      setSelectedLeadIds((current) => current.filter((item) => item !== id));
 
       if (editingLeadId === id) {
         cancelEditing();
@@ -336,11 +448,136 @@ export default function OpportunitiesPage() {
         closeDetails();
       }
 
+      setConfirmDeleteLead(null);
       setSuccess("Opportunity deleted.");
+      notify("success", "Opportunity deleted", `${confirmDeleteLead.name} was removed safely.`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to delete opportunity",
+      const message = err instanceof Error ? err.message : "Unable to delete opportunity";
+      setError(message);
+      notify("error", "Delete failed", message);
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  async function bulkMoveSelected() {
+    if (!selectedLeadIds.length) return;
+    setBulkWorking(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const selected = leads.filter((lead) => selectedLeadIds.includes(lead.id));
+      const updatedLeads = await Promise.all(
+        selected.map((lead) => updateLeadStatus(lead.id, bulkStatus)),
       );
+      const updatedMap = new Map(updatedLeads.map((lead) => [lead.id, lead]));
+      setLeads((current) => current.map((lead) => updatedMap.get(lead.id) ?? lead));
+      clearSelection();
+      await load(true);
+      notify("success", "Bulk stage updated", `${selected.length} opportunities moved to ${bulkStatus}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update selected opportunities";
+      setError(message);
+      notify("error", "Bulk update failed", message);
+      void load(true);
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  async function bulkDeleteSelected() {
+    if (!selectedLeadIds.length) return;
+    setBulkWorking(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      await Promise.all(selectedLeadIds.map((id) => deleteLead(id)));
+      const deletedCount = selectedLeadIds.length;
+      setLeads((current) => current.filter((lead) => !selectedLeadIds.includes(lead.id)));
+      clearSelection();
+      setConfirmBulkDelete(false);
+      notify("success", "Bulk delete completed", `${deletedCount} opportunities were removed.`);
+      await load(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete selected opportunities";
+      setError(message);
+      notify("error", "Bulk delete failed", message);
+      void load(true);
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
+  function exportCsv(items = leads) {
+    const csv = [
+      csvColumns.join(","),
+      ...items.map((lead) => csvColumns.map((column) => escapeCsv(lead[column])).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vireqo-opportunities-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    notify("success", "CSV exported", `${items.length} opportunities downloaded.`);
+  }
+
+  async function importCsv(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setBulkWorking(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((line) => line.trim());
+      if (lines.length < 2) throw new Error("CSV must include a header row and at least one opportunity.");
+
+      const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase().trim());
+      let importedCount = 0;
+
+      for (const line of lines.slice(1)) {
+        const cells = parseCsvLine(line);
+        const row = new Map(headers.map((header, index) => [header, cells[index] ?? ""]));
+        const name = row.get("name")?.trim() || row.get("lead")?.trim() || "Imported opportunity";
+        const statusValue = (row.get("status") ?? "").trim().toLowerCase();
+        const notes = row.get("notes") ?? "";
+
+        const created = await createLead({
+          name,
+          email: row.get("email") ?? "",
+          phone: row.get("phone") ?? "",
+          company: row.get("company") ?? "",
+          need: row.get("need") || row.get("requirement") || "Imported from CSV",
+          budget: row.get("budget") ?? "",
+          timeline: row.get("timeline") ?? "",
+          source: row.get("source") || "CSV import",
+        });
+
+        const updatePayload: Partial<Lead> = {};
+        if (validLeadStatus(statusValue)) updatePayload.status = statusValue;
+        if (notes) updatePayload.notes = notes;
+        if (Object.keys(updatePayload).length) await updateLead(created.id, updatePayload);
+        importedCount += 1;
+      }
+
+      await load(true);
+      notify("success", "CSV imported", `${importedCount} opportunities added to the CRM.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to import CSV";
+      setError(message);
+      notify("error", "Import failed", message);
+    } finally {
+      setBulkWorking(false);
     }
   }
 
@@ -363,6 +600,7 @@ export default function OpportunitiesPage() {
       source: "automation",
     });
     setSuccess("Task created from automation suggestion.");
+    notify("success", "Task created", "Automation suggestion was saved as a task.");
     void load(true);
     if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
   }
@@ -376,11 +614,13 @@ export default function OpportunitiesPage() {
       source: "manual",
     });
     setSuccess("Follow-up task created.");
+    notify("success", "Follow-up task created", `Task added for ${lead.name}.`);
     if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
   }
 
   return (
     <DashboardShell>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <div className="module-heading">
         <div>
           <span className="dashboard-eyebrow">
@@ -878,13 +1118,46 @@ export default function OpportunitiesPage() {
             List
           </button>
         </div>
+
+        <button className="button" type="button" onClick={toggleVisibleSelection} disabled={!leads.length}>
+          {allVisibleSelected ? <CheckSquare size={15} /> : <Square size={15} />}
+          {allVisibleSelected ? "Clear visible" : "Select visible"}
+        </button>
+
+        <button className="button" type="button" onClick={() => exportCsv(leads)} disabled={!leads.length}>
+          <Download size={15} />
+          Export CSV
+        </button>
+
+        <label className={`button csv-import-button ${bulkWorking ? "disabled" : ""}`}>
+          <FileUp size={15} />
+          Import CSV
+          <input type="file" accept=".csv,text/csv" onChange={(event) => void importCsv(event)} disabled={bulkWorking} />
+        </label>
       </div>
 
+      <BulkActionBar selectedCount={selectedLeadIds.length} onClear={clearSelection}>
+        <select value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as Lead["status"])}>
+          {statusOptions.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+        <button className="button button-dashboard" type="button" onClick={() => void bulkMoveSelected()} disabled={bulkWorking}>
+          {bulkWorking ? <LoaderCircle className="spin" size={15} /> : <CheckSquare size={15} />}
+          Move selected
+        </button>
+        <button className="button" type="button" onClick={() => exportCsv(leads.filter((lead) => selectedLeadIds.includes(lead.id)))}>
+          <Download size={15} />
+          Export selected
+        </button>
+        <button className="button button-danger" type="button" onClick={() => setConfirmBulkDelete(true)} disabled={bulkWorking}>
+          <Trash2 size={15} />
+          Delete selected
+        </button>
+      </BulkActionBar>
+
       {loading ? (
-        <div className="module-loading">
-          <LoaderCircle className="spin" />
-          Loading opportunities
-        </div>
+        <LoadingSkeleton rows={5} />
       ) : viewMode === "kanban" ? (
         <PipelineKanban
           leads={leads}
@@ -892,7 +1165,7 @@ export default function OpportunitiesPage() {
           onStatusChange={changeStatus}
           onEdit={startEditing}
           onOpenDetails={openDetails}
-          onDelete={remove}
+          onDelete={requestRemove}
         />
       ) : (
         <div className="module-list">
@@ -903,9 +1176,18 @@ export default function OpportunitiesPage() {
 
             return (
               <article
-                className="module-card opportunity-card predictive-opportunity-card"
+                className={`module-card opportunity-card predictive-opportunity-card ${selectedLeadIds.includes(lead.id) ? "selected" : ""}`}
                 key={lead.id}
               >
+                <button
+                  className="row-select-button"
+                  type="button"
+                  onClick={() => toggleLeadSelection(lead.id)}
+                  aria-label={`${selectedLeadIds.includes(lead.id) ? "Unselect" : "Select"} ${lead.name}`}
+                >
+                  {selectedLeadIds.includes(lead.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                </button>
+
                 <div className="module-card-main">
                   <span className={`temperature ${temperature}`}>
                     <i />
@@ -998,7 +1280,7 @@ export default function OpportunitiesPage() {
                 <button
                   className="icon-button"
                   type="button"
-                  onClick={() => void remove(lead.id)}
+                  onClick={() => requestRemove(lead.id)}
                   aria-label={`Delete ${lead.name}`}
                 >
                   <Trash2 size={16} />
@@ -1010,10 +1292,33 @@ export default function OpportunitiesPage() {
       )}
 
       {!loading && leads.length === 0 && (
-        <div className="module-empty">
-          No opportunities match these filters.
-        </div>
+        <EmptyState
+          title="No opportunities found"
+          description={search || status || temperature ? "Try clearing filters or import a CSV to fill this workspace faster." : "Create your first opportunity manually, through AI, or by importing a CSV file."}
+          actionLabel="Add opportunity"
+          onAction={() => setShowCreate(true)}
+        />
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteLead)}
+        title="Delete opportunity?"
+        description={confirmDeleteLead ? `This will permanently remove ${confirmDeleteLead.name} and its linked CRM context from this workspace.` : "This opportunity will be removed permanently."}
+        confirmLabel="Delete opportunity"
+        loading={bulkWorking}
+        onCancel={() => setConfirmDeleteLead(null)}
+        onConfirm={() => void confirmRemove()}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete selected opportunities?"
+        description={`This will permanently remove ${selectedLeadIds.length} selected opportunities. Export them first if you need a backup.`}
+        confirmLabel="Delete selected"
+        loading={bulkWorking}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={() => void bulkDeleteSelected()}
+      />
 
       <DealDetailDrawer
         open={detailOpen}

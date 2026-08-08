@@ -2,6 +2,13 @@
 
 import { DashboardShell } from "@/components/DashboardShell";
 import { TaskPanel } from "@/components/TaskPanel";
+import {
+  ConfirmDialog,
+  EmptyState,
+  LoadingSkeleton,
+  ToastStack,
+  type PolishToast,
+} from "@/components/PolishKit";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   completeTask,
@@ -68,6 +75,9 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [toasts, setToasts] = useState<PolishToast[]>([]);
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState<Task | null>(null);
+  const [deleteWorking, setDeleteWorking] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("open");
   const [priority, setPriority] = useState("");
@@ -76,6 +86,18 @@ export default function TasksPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const leadMap = useMemo(() => new Map(leads.map((lead) => [lead.id, lead])), [leads]);
+
+  function notify(tone: PolishToast["tone"], title: string, message?: string) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [{ id, tone, title, message }, ...current].slice(0, 4));
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 5200);
+  }
+
+  function dismissToast(id: string) {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }
 
   async function load(silent = false) {
     if (!silent) setLoading(true);
@@ -130,16 +152,20 @@ export default function TasksPage() {
       if (editingId) {
         await updateTask(editingId, payload);
         setSuccess("Task updated.");
+        notify("success", "Task updated", "The reminder details were saved.");
       } else {
         await createTask(payload);
         setSuccess("Task created.");
+        notify("success", "Task created", "New reminder saved to your workspace.");
       }
 
       setForm(emptyForm);
       setEditingId(null);
       await load(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save task");
+      const message = err instanceof Error ? err.message : "Unable to save task";
+      setError(message);
+      notify("error", "Task save failed", message);
     } finally {
       setSaving(false);
     }
@@ -160,18 +186,41 @@ export default function TasksPage() {
   }
 
   async function markDone(task: Task) {
-    await completeTask(task.id);
-    await load(true);
+    try {
+      await completeTask(task.id);
+      notify("success", "Task completed", task.title);
+      await load(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to complete task";
+      setError(message);
+      notify("error", "Task update failed", message);
+    }
   }
 
-  async function remove(task: Task) {
-    if (!window.confirm("Delete this task permanently?")) return;
-    await deleteTask(task.id);
-    await load(true);
+  function requestRemove(task: Task) {
+    setConfirmDeleteTask(task);
+  }
+
+  async function confirmRemove() {
+    if (!confirmDeleteTask) return;
+    setDeleteWorking(true);
+    try {
+      await deleteTask(confirmDeleteTask.id);
+      notify("success", "Task deleted", confirmDeleteTask.title);
+      setConfirmDeleteTask(null);
+      await load(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete task";
+      setError(message);
+      notify("error", "Delete failed", message);
+    } finally {
+      setDeleteWorking(false);
+    }
   }
 
   return (
     <DashboardShell>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <div className="module-heading">
         <div>
           <span className="dashboard-eyebrow">
@@ -295,7 +344,7 @@ export default function TasksPage() {
       </div>
 
       {loading ? (
-        <div className="module-loading"><LoaderCircle className="spin" /> Loading tasks</div>
+        <LoadingSkeleton rows={5} />
       ) : (
         <div className="task-page-list">
           {tasks.map((task) => (
@@ -321,7 +370,7 @@ export default function TasksPage() {
                   </button>
                 )}
                 <button className="button" type="button" onClick={() => edit(task)}>Edit</button>
-                <button className="icon-button" type="button" onClick={() => void remove(task)} aria-label={`Delete ${task.title}`}>
+                <button className="icon-button" type="button" onClick={() => requestRemove(task)} aria-label={`Delete ${task.title}`}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -330,7 +379,24 @@ export default function TasksPage() {
         </div>
       )}
 
-      {!loading && tasks.length === 0 && <div className="module-empty">No tasks match these filters.</div>}
+      {!loading && tasks.length === 0 && (
+        <EmptyState
+          title="No tasks found"
+          description={search || priority || dueScope || status !== "open" ? "Try clearing filters or create a fresh reminder from this page." : "Create your first reminder manually, from AI, or from a pipeline automation suggestion."}
+          actionLabel="Create task"
+          onAction={() => document.getElementById("task-form")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteTask)}
+        title="Delete task?"
+        description={confirmDeleteTask ? `This will permanently delete “${confirmDeleteTask.title}”.` : "This task will be removed permanently."}
+        confirmLabel="Delete task"
+        loading={deleteWorking}
+        onCancel={() => setConfirmDeleteTask(null)}
+        onConfirm={() => void confirmRemove()}
+      />
     </DashboardShell>
   );
 }
