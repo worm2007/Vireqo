@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import Base, SessionLocal, engine
-from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, team
+from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
 from .seed import seed_demo_data
 
 
@@ -42,6 +42,7 @@ app.include_router(leads.router, prefix="/api/v1")
 app.include_router(chatbot.router, prefix="/api/v1")
 app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
+app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(realtime.router, prefix="/api/v1")

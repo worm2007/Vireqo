@@ -532,6 +532,64 @@ class AppointmentPublic(BaseModel):
     created_at: datetime
 
 
+class TaskCreate(BaseModel):
+    lead_id: str | None = None
+    title: str = Field(min_length=2, max_length=180)
+    description: str = Field(default="", max_length=3000)
+    priority: str = Field(default="medium", pattern="^(urgent|high|medium|low)$")
+    status: str = Field(default="open", pattern="^(open|completed|cancelled)$")
+    source: str = Field(default="manual", max_length=40)
+    due_at: datetime | None = None
+
+    @field_validator("title", "description", "source")
+    @classmethod
+    def strip_task_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class TaskUpdate(BaseModel):
+    lead_id: str | None = None
+    title: str | None = Field(default=None, min_length=2, max_length=180)
+    description: str | None = Field(default=None, max_length=3000)
+    priority: str | None = Field(default=None, pattern="^(urgent|high|medium|low)$")
+    status: str | None = Field(default=None, pattern="^(open|completed|cancelled)$")
+    source: str | None = Field(default=None, max_length=40)
+    due_at: datetime | None = None
+
+    @field_validator("title", "description", "source")
+    @classmethod
+    def strip_optional_task_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class TaskPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    business_id: str
+    lead_id: str | None
+    created_by_id: str | None
+    title: str
+    description: str
+    priority: str
+    status: str
+    source: str
+    due_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskSummary(BaseModel):
+    generated_at: datetime
+    total_open: int
+    overdue: int
+    due_today: int
+    high_priority: int
+    completed: int
+    headline: str
+
+
 class AnalyticsSummary(BaseModel):
     total_leads: int
     new_leads: int
@@ -576,6 +634,7 @@ class LeadActivitySummary(BaseModel):
     appointment_count: int
     conversation_count: int
     audit_count: int
+    task_count: int = 0
 
 
 class LeadDetailResponse(BaseModel):
@@ -585,5 +644,6 @@ class LeadDetailResponse(BaseModel):
     appointments: list[AppointmentPublic] = Field(default_factory=list)
     conversations: list[ConversationPublic] = Field(default_factory=list)
     audits: list[AuditLogPublic] = Field(default_factory=list)
+    tasks: list[TaskPublic] = Field(default_factory=list)
     timeline: list[LeadTimelineItem] = Field(default_factory=list)
 

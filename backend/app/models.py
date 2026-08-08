@@ -41,6 +41,7 @@ class Business(Base):
     appointments: Mapped[list["Appointment"]] = relationship(
         back_populates="business", cascade="all, delete-orphan"
     )
+    tasks: Mapped[list["Task"]] = relationship(back_populates="business", cascade="all, delete-orphan")
 
 
 class User(Base):
@@ -113,6 +114,7 @@ class Lead(Base):
     business: Mapped[Business] = relationship(back_populates="leads")
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="lead")
     appointments: Mapped[list["Appointment"]] = relationship(back_populates="lead")
+    tasks: Mapped[list["Task"]] = relationship(back_populates="lead")
 
 
 class Conversation(Base):
@@ -169,3 +171,28 @@ class Appointment(Base):
 
     business: Mapped[Business] = relationship(back_populates="appointments")
     lead: Mapped[Lead | None] = relationship(back_populates="appointments")
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+    lead_id: Mapped[str | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(180))
+    description: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[str] = mapped_column(String(20), default="medium", index=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    source: Mapped[str] = mapped_column(String(40), default="manual", index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    business: Mapped[Business] = relationship(back_populates="tasks")
+    lead: Mapped[Lead | None] = relationship(back_populates="tasks")

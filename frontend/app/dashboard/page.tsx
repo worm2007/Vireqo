@@ -2,20 +2,25 @@
 
 import { DashboardShell } from "@/components/DashboardShell";
 import { PipelineAutomationPanel } from "@/components/PipelineAutomationPanel";
+import { TaskPanel } from "@/components/TaskPanel";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import { LeadTable } from "@/components/LeadTable";
 import {
   clearSession,
+  completeTask,
+  createTask,
   getAnalytics,
   getCurrentUser,
   getExecutiveInsights,
   getLeads,
   getPipelineAutomation,
   getRevenueForecast,
+  getTaskSummary,
+  getTasks,
   getWeeklyReport,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Analytics, ExecutiveInsights, Lead, PipelineAutomation, RevenueForecast, User, WeeklyReport } from "@/lib/types";
+import type { Analytics, ExecutiveInsights, Lead, PipelineAutomation, PipelineAutomationAction, RevenueForecast, Task, TaskSummary, User, WeeklyReport } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowDownRight,
@@ -58,6 +63,8 @@ export default function DashboardPage() {
   const [forecast, setForecast] = useState<RevenueForecast | null>(null);
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
   const [automation, setAutomation] = useState<PipelineAutomation | null>(null);
+  const [taskSummary, setTaskSummary] = useState<TaskSummary | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
@@ -65,13 +72,15 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [currentUser, summary, executive, revenue, weekly, pipelineAutomation, items] = await Promise.all([
+      const [currentUser, summary, executive, revenue, weekly, pipelineAutomation, taskStats, taskItems, items] = await Promise.all([
         getCurrentUser(),
         getAnalytics(),
         getExecutiveInsights(),
         getRevenueForecast(),
         getWeeklyReport(),
         getPipelineAutomation(),
+        getTaskSummary(),
+        getTasks({ status: "open", limit: 6 }),
         getLeads({ limit: 100 }),
       ]);
       setUser(currentUser);
@@ -80,6 +89,8 @@ export default function DashboardPage() {
       setForecast(revenue);
       setWeeklyReport(weekly);
       setAutomation(pipelineAutomation);
+      setTaskSummary(taskStats);
+      setTasks(taskItems);
       setLeads(items);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load the dashboard";
@@ -98,29 +109,66 @@ export default function DashboardPage() {
 
   useWorkspaceEvent(() => {
     void load();
-  }, ["lead.", "appointment.", "conversation."]);
+  }, ["lead.", "appointment.", "conversation.", "task."]);
 
   async function changeStatus(lead: Lead, status: Lead["status"]) {
     const previous = lead.status;
     setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status } : item));
     try {
       await updateLeadStatus(lead.id, status);
-      const [summary, executive, revenue, weekly, pipelineAutomation] = await Promise.all([
+      const [summary, executive, revenue, weekly, pipelineAutomation, taskStats, taskItems] = await Promise.all([
         getAnalytics(),
         getExecutiveInsights(),
         getRevenueForecast(),
         getWeeklyReport(),
         getPipelineAutomation(),
+        getTaskSummary(),
+        getTasks({ status: "open", limit: 6 }),
       ]);
       setAnalytics(summary);
       setInsights(executive);
       setForecast(revenue);
       setWeeklyReport(weekly);
       setAutomation(pipelineAutomation);
+      setTaskSummary(taskStats);
+      setTasks(taskItems);
     } catch {
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: previous } : item));
       setError("Status update failed. The previous value was restored.");
     }
+  }
+
+  async function markTaskComplete(task: Task) {
+    const previous = tasks;
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    try {
+      await completeTask(task.id);
+      const [taskStats, taskItems] = await Promise.all([
+        getTaskSummary(),
+        getTasks({ status: "open", limit: 6 }),
+      ]);
+      setTaskSummary(taskStats);
+      setTasks(taskItems);
+    } catch {
+      setTasks(previous);
+      setError("Unable to complete task.");
+    }
+  }
+
+  async function createTaskFromAutomation(action: PipelineAutomationAction) {
+    await createTask({
+      lead_id: action.lead_id,
+      title: action.title,
+      description: `${action.description} ${action.reason ? `Reason: ${action.reason}` : ""}`.trim(),
+      priority: action.priority === "urgent" || action.priority === "high" ? action.priority : "medium",
+      source: "automation",
+    });
+    const [taskStats, taskItems] = await Promise.all([
+      getTaskSummary(),
+      getTasks({ status: "open", limit: 6 }),
+    ]);
+    setTaskSummary(taskStats);
+    setTasks(taskItems);
   }
 
   const chart = useMemo(() => chartByRange[rangeDays], [rangeDays]);
@@ -363,8 +411,15 @@ export default function DashboardPage() {
             leads={leads}
             compact
             onChangeStatus={changeStatus}
+            onCreateTask={createTaskFromAutomation}
           />
 
+          <TaskPanel
+            tasks={tasks}
+            summary={taskSummary}
+            compact
+            onComplete={markTaskComplete}
+          />
 
           <div className="dashboard-insight-grid">
             <section className="pipeline-chart-card">

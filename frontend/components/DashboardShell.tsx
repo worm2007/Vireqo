@@ -12,6 +12,7 @@ import {
   Bot,
   CalendarDays,
   ChevronDown,
+  ListTodo,
   CircleUserRound,
   ClipboardList,
   LayoutDashboard,
@@ -36,6 +37,7 @@ const nav = [
   { icon: UsersRound, label: "Opportunities", href: "/dashboard/opportunities" },
   { icon: MessageSquareText, label: "Conversations", href: "/dashboard/conversations" },
   { icon: CalendarDays, label: "Appointments", href: "/dashboard/appointments" },
+  { icon: ListTodo, label: "Tasks", href: "/dashboard/tasks" },
 ];
 
 const manage = [

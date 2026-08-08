@@ -1,6 +1,6 @@
 "use client";
 
-import type { Lead, PipelineAutomation } from "@/lib/types";
+import type { Lead, PipelineAutomation, PipelineAutomationAction } from "@/lib/types";
 import {
   ArrowRight,
   BellRing,
@@ -22,6 +22,7 @@ type Props = {
   compact?: boolean;
   onOpenLead?: (lead: Lead) => void;
   onChangeStatus?: (lead: Lead, status: Lead["status"]) => Promise<void> | void;
+  onCreateTask?: (action: PipelineAutomationAction) => Promise<void> | void;
 };
 
 const priorityLabels: Record<string, string> = {
@@ -45,8 +46,10 @@ export function PipelineAutomationPanel({
   compact = false,
   onOpenLead,
   onChangeStatus,
+  onCreateTask,
 }: Props) {
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [taskCreatingId, setTaskCreatingId] = useState<string | null>(null);
   const [localDone, setLocalDone] = useState<Set<string>>(new Set());
 
   const leadMap = useMemo(() => new Map(leads.map((lead) => [lead.id, lead])), [leads]);
@@ -64,6 +67,17 @@ export function PipelineAutomationPanel({
       setLocalDone((current) => new Set(current).add(actionId));
     } finally {
       setApplyingId(null);
+    }
+  }
+
+  async function createTaskFromAction(action: PipelineAutomationAction) {
+    if (!onCreateTask) return;
+    setTaskCreatingId(action.id);
+    try {
+      await onCreateTask(action);
+      setLocalDone((current) => new Set(current).add(action.id));
+    } finally {
+      setTaskCreatingId(null);
     }
   }
 
@@ -167,6 +181,17 @@ export function PipelineAutomationPanel({
                     >
                       {applyingId === action.id ? <LoaderCircle className="spin" size={14} /> : <MoveRight size={14} />}
                       Move to {statusLabel(action.suggested_status)}
+                    </button>
+                  )}
+                  {onCreateTask && (
+                    <button
+                      className="automation-task-button"
+                      type="button"
+                      onClick={() => void createTaskFromAction(action)}
+                      disabled={taskCreatingId === action.id}
+                    >
+                      {taskCreatingId === action.id ? <LoaderCircle className="spin" size={14} /> : <BellRing size={14} />}
+                      Create task
                     </button>
                   )}
                   <button

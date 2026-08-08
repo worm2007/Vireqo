@@ -263,6 +263,32 @@ export type PipelineAutomation = {
 };
 
 
+export type Task = {
+  id: string;
+  business_id: string;
+  lead_id?: string | null;
+  created_by_id?: string | null;
+  title: string;
+  description: string;
+  priority: "urgent" | "high" | "medium" | "low" | string;
+  status: "open" | "completed" | "cancelled" | string;
+  source: "manual" | "automation" | "ai" | string;
+  due_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskSummary = {
+  generated_at: string;
+  total_open: number;
+  overdue: number;
+  due_today: number;
+  high_priority: number;
+  completed: number;
+  headline: string;
+};
+
 export type Appointment = {
   id: string;
   lead_id?: string | null;
@@ -412,6 +438,7 @@ export type LeadActivitySummary = {
   appointment_count: number;
   conversation_count: number;
   audit_count: number;
+  task_count: number;
 };
 
 export type LeadDetail = {
@@ -421,6 +448,7 @@ export type LeadDetail = {
   appointments: Appointment[];
   conversations: Conversation[];
   audits: AuditLog[];
+  tasks: Task[];
   timeline: LeadTimelineItem[];
 };
 

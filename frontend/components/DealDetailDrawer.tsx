@@ -10,10 +10,12 @@ import {
   CheckCircle2,
   Clock3,
   History,
+  ListTodo,
   LoaderCircle,
   Mail,
   MessageSquareText,
   Pencil,
+  Plus,
   Phone,
   RefreshCcw,
   Sparkles,
@@ -39,6 +41,7 @@ type DealDetailDrawerProps = {
   onEdit: (lead: Lead) => void;
   onRefresh: () => void;
   onStatusChange: (lead: Lead, nextStatus: Lead["status"]) => void | Promise<void>;
+  onCreateTask?: (lead: Lead) => void | Promise<void>;
 };
 
 function formatDate(value?: string | null) {
@@ -74,6 +77,7 @@ function getTimelineIcon(type: string) {
   if (type === "appointment") return CalendarClock;
   if (type === "conversation") return MessageSquareText;
   if (type === "audit") return History;
+  if (type === "task") return ListTodo;
   return Activity;
 }
 
@@ -86,6 +90,7 @@ export function DealDetailDrawer({
   onEdit,
   onRefresh,
   onStatusChange,
+  onCreateTask,
 }: DealDetailDrawerProps) {
   const lead = detail?.lead ?? null;
   const prediction = detail?.prediction ?? null;
@@ -230,6 +235,32 @@ export function DealDetailDrawer({
               </div>
             </section>
 
+            <section className="deal-task-card">
+              <div className="deal-section-title">
+                <ListTodo size={18} />
+                <div>
+                  <h3>Tasks and reminders</h3>
+                  <p>{detail.summary.task_count} linked task{detail.summary.task_count === 1 ? "" : "s"} in this deal timeline.</p>
+                </div>
+              </div>
+
+              <div className="deal-task-list">
+                {detail.tasks.length ? detail.tasks.slice(0, 5).map((task) => (
+                  <div className={`deal-task-row priority-${task.priority} status-${task.status}`} key={task.id}>
+                    <span><strong>{task.title}</strong><small>{task.description || `${task.priority} priority · ${task.source}`}</small></span>
+                    <em>{task.due_at ? formatDate(task.due_at) : task.status}</em>
+                  </div>
+                )) : <div className="module-empty compact">No tasks linked to this deal yet.</div>}
+              </div>
+
+              {onCreateTask && (
+                <button className="button button-dashboard" type="button" onClick={() => void onCreateTask(lead)}>
+                  <Plus size={15} />
+                  Create follow-up task
+                </button>
+              )}
+            </section>
+
             {prediction && (
               <section className="deal-ai-card">
                 <div className="deal-section-title">
@@ -257,7 +288,7 @@ export function DealDetailDrawer({
                 <div>
                   <h3>Activity timeline</h3>
                   <p>
-                    {detail.summary.activity_count} events · {detail.summary.appointment_count} meetings · {detail.summary.conversation_count} conversations
+                    {detail.summary.activity_count} events · {detail.summary.appointment_count} meetings · {detail.summary.conversation_count} conversations · {detail.summary.task_count} tasks
                   </p>
                 </div>
               </div>

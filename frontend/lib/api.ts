@@ -14,6 +14,8 @@ import type {
   LeadIntelligence,
   PipelineAutomation,
   RevenueForecast,
+  Task,
+  TaskSummary,
   TeamMember,
   User,
   WorkspaceDraftRequest,
@@ -278,6 +280,51 @@ export async function getWeeklyReport(): Promise<WeeklyReport> {
 
 export async function getPipelineAutomation(): Promise<PipelineAutomation> {
   return authenticatedRequest<PipelineAutomation>("/analytics/pipeline-automation");
+}
+
+export async function getTaskSummary(): Promise<TaskSummary> {
+  return authenticatedRequest<TaskSummary>("/tasks/summary");
+}
+
+export async function getTasks(params: {
+  status?: string;
+  lead_id?: string;
+  priority?: string;
+  due_scope?: "overdue" | "today" | "upcoming" | string;
+  search?: string;
+  limit?: number;
+} = {}): Promise<Task[]> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.lead_id) query.set("lead_id", params.lead_id);
+  if (params.priority) query.set("priority", params.priority);
+  if (params.due_scope) query.set("due_scope", params.due_scope);
+  if (params.search) query.set("search", params.search);
+  if (params.limit) query.set("limit", String(params.limit));
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return authenticatedRequest<Task[]>(`/tasks${suffix}`);
+}
+
+export async function createTask(payload: Partial<Task>): Promise<Task> {
+  return authenticatedRequest<Task>("/tasks", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTask(id: string, payload: Partial<Task>): Promise<Task> {
+  return authenticatedRequest<Task>(`/tasks/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completeTask(id: string): Promise<Task> {
+  return authenticatedRequest<Task>(`/tasks/${encodeURIComponent(id)}/complete`, { method: "PATCH" });
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  return authenticatedRequest<void>(`/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function getLeads(params: {

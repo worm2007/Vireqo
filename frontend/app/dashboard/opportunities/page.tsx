@@ -7,6 +7,7 @@ import { PipelineAutomationPanel } from "@/components/PipelineAutomationPanel";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
+  createTask,
   deleteLead,
   getLeadDetail,
   getLeadIntelligence,
@@ -16,7 +17,7 @@ import {
   updateLead,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Lead, LeadDetail, LeadIntelligence, PipelineAutomation, RevenueForecast } from "@/lib/types";
+import type { Lead, LeadDetail, LeadIntelligence, PipelineAutomation, PipelineAutomationAction, RevenueForecast } from "@/lib/types";
 import {
   AlertTriangle,
   BrainCircuit,
@@ -179,7 +180,7 @@ export default function OpportunitiesPage() {
   useWorkspaceEvent(() => {
     void load(true);
     if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
-  }, ["lead.", "appointment.", "conversation.", "ai."]);
+  }, ["lead.", "appointment.", "conversation.", "task.", "ai."]);
 
   const predictionMap = useMemo(() => {
     return new Map((intelligence?.predictions ?? []).map((item) => [item.lead_id, item]));
@@ -353,6 +354,31 @@ export default function OpportunitiesPage() {
     if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
   }
 
+  async function createTaskFromAutomation(action: PipelineAutomationAction) {
+    await createTask({
+      lead_id: action.lead_id,
+      title: action.title,
+      description: `${action.description} ${action.reason ? `Reason: ${action.reason}` : ""}`.trim(),
+      priority: action.priority === "urgent" || action.priority === "high" ? action.priority : "medium",
+      source: "automation",
+    });
+    setSuccess("Task created from automation suggestion.");
+    void load(true);
+    if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
+  }
+
+  async function createFollowUpTask(lead: Lead) {
+    await createTask({
+      lead_id: lead.id,
+      title: `Follow up with ${lead.name}`,
+      description: `Review the deal timeline and send the next follow-up for ${lead.company || lead.email || lead.name}.`,
+      priority: lead.temperature === "hot" || lead.status === "qualified" ? "high" : "medium",
+      source: "manual",
+    });
+    setSuccess("Follow-up task created.");
+    if (selectedLeadId) void loadLeadDetail(selectedLeadId, true);
+  }
+
   return (
     <DashboardShell>
       <div className="module-heading">
@@ -478,6 +504,7 @@ export default function OpportunitiesPage() {
         leads={leads}
         onOpenLead={openDetails}
         onChangeStatus={changeStatus}
+        onCreateTask={createTaskFromAutomation}
       />
 
 
@@ -999,6 +1026,7 @@ export default function OpportunitiesPage() {
           if (selectedLeadId) void loadLeadDetail(selectedLeadId);
         }}
         onStatusChange={changeStatusFromDrawer}
+        onCreateTask={createFollowUpTask}
       />
     </DashboardShell>
   );

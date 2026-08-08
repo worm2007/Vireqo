@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import Appointment, AuditLog, Conversation, Lead, User
+from ..models import Appointment, AuditLog, Conversation, Lead, Task, User
 from ..schemas import (
     AppointmentPublic,
     AuditLogPublic,
@@ -18,6 +18,7 @@ from ..schemas import (
     LeadPrediction,
     LeadPublic,
     LeadTimelineItem,
+    TaskPublic,
 )
 from .lead_scoring import calculate_lead_intelligence
 
@@ -155,6 +156,15 @@ def build_lead_detail(db: Session, user: User, lead_id: str) -> LeadDetailRespon
         ).all()
     )
 
+    tasks = list(
+        db.scalars(
+            select(Task)
+            .where(Task.business_id == business_id, Task.lead_id == lead.id)
+            .order_by(desc(Task.created_at))
+            .limit(30)
+        ).all()
+    )
+
     intelligence = calculate_lead_intelligence(
         lead=lead,
         appointments=appointments,
@@ -235,6 +245,21 @@ def build_lead_detail(db: Session, user: User, lead_id: str) -> LeadDetailRespon
             )
         )
 
+    for task in tasks:
+        timestamp = task.completed_at or task.due_at or task.created_at
+        status_label = task.status.replace("_", " ").title()
+        timeline.append(
+            _timeline_item(
+                item_id=f"task-{task.id}",
+                item_type="task",
+                title=f"Task: {task.title}",
+                description=task.description or f"{status_label} {task.priority} priority task.",
+                timestamp=timestamp,
+                tone="positive" if task.status == "completed" else ("warning" if task.priority in {"urgent", "high"} else "neutral"),
+                metadata={"task_id": task.id, "status": task.status, "priority": task.priority},
+            )
+        )
+
     for audit in audits:
         timeline.append(
             _timeline_item(
@@ -274,6 +299,7 @@ def build_lead_detail(db: Session, user: User, lead_id: str) -> LeadDetailRespon
         appointment_count=len(appointments),
         conversation_count=len(conversations),
         audit_count=len(audits),
+        task_count=len(tasks),
     )
 
     return LeadDetailResponse(
@@ -283,5 +309,6 @@ def build_lead_detail(db: Session, user: User, lead_id: str) -> LeadDetailRespon
         appointments=[AppointmentPublic.model_validate(item) for item in appointments],
         conversations=[ConversationPublic.model_validate(item) for item in conversations],
         audits=[AuditLogPublic.model_validate(item) for item in audits],
+        tasks=[TaskPublic.model_validate(item) for item in tasks],
         timeline=timeline[:80],
     )

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from ..models import Appointment, Lead, User
+from ..models import Appointment, Lead, Task, User
 from .audit import record_audit
 from .lead_scoring import calculate_lead_score
 
@@ -332,6 +332,99 @@ def _update_status(db: Session, user: User, message: str, active_lead: Lead | No
     )
 
 
+
+def _parse_task_due(message: str) -> datetime | None:
+    explicit = _parse_datetime(message)
+    if explicit:
+        return explicit
+
+    lowered = message.lower()
+    now_local = datetime.now().astimezone()
+    if "tomorrow" in lowered:
+        date_value = now_local.date() + timedelta(days=1)
+    elif "today" in lowered:
+        date_value = now_local.date()
+    else:
+        return None
+
+    local_dt = datetime.combine(date_value, datetime.min.time(), tzinfo=now_local.tzinfo).replace(
+        hour=17,
+        minute=0,
+    )
+    return local_dt.astimezone(timezone.utc)
+
+
+def _create_task(db: Session, user: User, message: str, active_lead: Lead | None, request=None) -> AiActionResult:
+    lowered = message.lower()
+    if not (
+        re.search(r"\b(create|add|make)\b", lowered) and re.search(r"\b(task|reminder|todo|to-do)\b", lowered)
+    ) and not re.search(r"\bremind me to\b", lowered):
+        return AiActionResult(False)
+
+    lead = None
+    target_match = re.search(
+        r"\b(?:for|with|about)\s+(.+?)(?=\s+(?:today|tomorrow|on|at|by)\b|[,;]|$)",
+        message,
+        re.IGNORECASE,
+    )
+    if target_match:
+        target = _resolve_target(target_match.group(1), active_lead)
+        lead = _find_lead(db, user.business_id, target)
+    elif active_lead and re.search(r"\b(him|her|them|that lead|same person|this lead)\b", lowered):
+        lead = active_lead
+
+    task_title = re.sub(r"^\s*(?:create|add|make)\s+(?:a\s+)?(?:task|reminder|todo|to-do)\s*(?:to\s+)?", "", message, flags=re.IGNORECASE)
+    task_title = re.sub(r"^\s*remind me to\s+", "", task_title, flags=re.IGNORECASE)
+    task_title = re.sub(r"\b(?:today|tomorrow|on\s+20\d{2}-\d{1,2}-\d{1,2}|at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b", "", task_title, flags=re.IGNORECASE)
+    task_title = re.sub(r"\s+", " ", task_title).strip(" ,.-")
+
+    if not task_title:
+        return AiActionResult(True, "Please include the task. Example: Create a task to follow up with Rahul tomorrow.")
+
+    priority = "medium"
+    if re.search(r"\b(urgent|critical|asap)\b", lowered):
+        priority = "urgent"
+    elif re.search(r"\b(today|high priority|important)\b", lowered):
+        priority = "high"
+    elif re.search(r"\b(low priority|later)\b", lowered):
+        priority = "low"
+
+    due_at = _parse_task_due(message)
+    task = Task(
+        business_id=user.business_id,
+        lead_id=lead.id if lead else None,
+        created_by_id=user.id,
+        title=task_title[:180],
+        description=(f"Created by Vireqo AI assistant{f' for {lead.name}' if lead else ''}."),
+        priority=priority,
+        source="ai",
+        due_at=due_at,
+    )
+    db.add(task)
+    db.flush()
+    record_audit(
+        db,
+        action="ai.task_created",
+        user=user,
+        entity_type="task",
+        entity_id=task.id,
+        details={"title": task.title, "lead_id": task.lead_id, "priority": task.priority},
+        request=request,
+    )
+    db.commit()
+    due_label = due_at.astimezone().strftime("%d %b, %I:%M %p") if due_at else "No due date"
+    linked_label = f"\nLinked lead: {lead.name}" if lead else ""
+    return AiActionResult(
+        True,
+        f"Task created\n\nTitle: {task.title}\nPriority: {task.priority.title()}\nDue: {due_label}{linked_label}",
+        "task.created",
+        f"Created task: {task.title}",
+        task.id,
+        lead.id if lead else (active_lead.id if active_lead else None),
+        lead.name if lead else (active_lead.name if active_lead else None),
+    )
+
+
 def _schedule_appointment(db: Session, user: User, message: str, active_lead: Lead | None, request=None) -> AiActionResult:
     match = re.search(
         r"(?:schedule|book|create)\s+(?:a\s+)?(?:meeting|appointment|call)\s+(?:with|for)\s+(.+?)(?=\s+(?:today|tomorrow|on|at)\b|[,;]|$)",
@@ -437,6 +530,10 @@ def try_workspace_action(
 
     if re.search(r"\b(show|list|find|display)\b", lowered) and re.search(r"\b(leads?|opportunities|prospects?)\b", lowered):
         return _list_leads(db, user, message)
+
+    task_result = _create_task(db, user, message, active_lead, request)
+    if task_result.handled:
+        return task_result
 
     if re.search(r"\b(create|add)\b", lowered) and re.search(r"\b(lead|contact|prospect)\b", lowered):
         return _create_lead(db, user, message, request)

@@ -31,6 +31,11 @@ const actionCopy: Record<string, { title: string; category: string }> = {
   "appointment.updated": { title: "Appointment updated", category: "Appointments" },
   "appointment.deleted": { title: "Appointment deleted", category: "Appointments" },
   "conversation.deleted": { title: "Conversation deleted", category: "Conversations" },
+  "task.created": { title: "Task created", category: "Tasks" },
+  "task.updated": { title: "Task updated", category: "Tasks" },
+  "task.completed": { title: "Task completed", category: "Tasks" },
+  "task.deleted": { title: "Task deleted", category: "Tasks" },
+  "ai.task_created": { title: "AI task created", category: "Tasks" },
 };
 
 function prettifyAction(action: string) {
