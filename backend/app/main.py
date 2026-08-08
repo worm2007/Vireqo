@@ -7,8 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import Base, SessionLocal, engine
+from .middleware import (
+    ApiRateLimitMiddleware,
+    RequestIdMiddleware,
+    RequestTimingMiddleware,
+    SecurityHeadersMiddleware,
+    install_exception_handlers,
+)
 from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
 from .seed import seed_demo_data
+
+API_VERSION = "0.4.2"
 
 
 @asynccontextmanager
@@ -23,18 +32,25 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version=API_VERSION,
     description="Authentication, CRM, conversations, appointments and analytics APIs for Vireqo.",
     lifespan=lifespan,
 )
+
+install_exception_handlers(app)
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(RequestTimingMiddleware)
+app.add_middleware(ApiRateLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Total-Count"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Total-Count", "X-Request-ID", "X-RateLimit-Remaining"],
 )
 
 app.include_router(auth.router, prefix="/api/v1")
@@ -56,16 +72,17 @@ def root() -> dict[str, str]:
         "name": "Vireqo API",
         "status": "online",
         "environment": settings.environment,
-        "version": "0.4.0",
+        "version": API_VERSION,
         "docs": "/docs",
     }
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, str | bool]:
     return {
         "status": "healthy",
         "environment": settings.environment,
-        "version": "0.4.0",
+        "version": API_VERSION,
         "database": "sqlite" if settings.is_sqlite else "postgresql",
+        "rate_limit_enabled": settings.rate_limit_enabled,
     }

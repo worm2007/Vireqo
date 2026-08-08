@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..config import settings
 from ..database import get_db
 from ..models import AuthToken, Business, User, utcnow
+from ..rate_limit import auth_endpoint_limiter, auth_failure_limiter, get_client_ip
 from ..schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -34,6 +35,9 @@ from ..services.audit import record_audit
 from ..services.email import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+AUTH_ERROR = "Incorrect email or password"
+RATE_LIMIT_ERROR = "Too many attempts. Please wait and try again."
 
 
 def slugify(value: str) -> str:
@@ -75,8 +79,48 @@ def revoke_user_tokens(db: Session, user_id: str, purpose: str | None = None) ->
     db.execute(update(AuthToken).where(*conditions).values(revoked_at=utcnow()))
 
 
+def _too_many_requests(retry_after_seconds: int) -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail=RATE_LIMIT_ERROR,
+        headers={"Retry-After": str(retry_after_seconds)},
+    )
+
+
+def _check_auth_endpoint_limit(request: Request, action: str, identifier: str = "") -> None:
+    ip = get_client_ip(request)
+    key = f"auth_endpoint:{action}:{ip}:{identifier}" if identifier else f"auth_endpoint:{action}:{ip}"
+    result = auth_endpoint_limiter.check(key)
+    if not result.allowed:
+        raise _too_many_requests(result.retry_after_seconds)
+
+
+def _login_failure_keys(request: Request, email: str) -> list[str]:
+    ip = get_client_ip(request)
+    normalized_email = email.strip().lower()
+    return [f"login_ip:{ip}", f"login_email:{normalized_email}", f"login_combo:{ip}:{normalized_email}"]
+
+
+def _enforce_login_failure_guard(request: Request, email: str) -> None:
+    for key in _login_failure_keys(request, email):
+        result = auth_failure_limiter.check(key, increment=False)
+        if not result.allowed:
+            raise _too_many_requests(result.retry_after_seconds)
+
+
+def _record_login_failure(request: Request, email: str) -> None:
+    for key in _login_failure_keys(request, email):
+        auth_failure_limiter.check(key, increment=True)
+
+
+def _clear_login_failures(request: Request, email: str) -> None:
+    for key in _login_failure_keys(request, email):
+        auth_failure_limiter.reset(key)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    _check_auth_endpoint_limit(request, "register")
     email = str(payload.email).strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -122,12 +166,18 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
     email = str(payload.email).strip().lower()
+    _check_auth_endpoint_limit(request, "login", email)
+    _enforce_login_failure_guard(request, email)
+
     user = db.scalar(select(User).options(selectinload(User.business)).where(User.email == email))
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+        _record_login_failure(request, email)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=AUTH_ERROR)
     if not user.is_active:
+        _record_login_failure(request, email)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive")
 
+    _clear_login_failures(request, email)
     response = issue_token_pair(db, user)
     record_audit(db, action="auth.login", user=user, entity_type="user", entity_id=user.id, request=request)
     db.commit()
@@ -136,6 +186,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 @router.post("/demo", response_model=TokenResponse)
 def demo_login(request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    _check_auth_endpoint_limit(request, "demo")
     user = db.scalar(select(User).options(selectinload(User.business)).where(User.email == "demo@vireqo.app"))
     if not user:
         raise HTTPException(status_code=404, detail="Demo account is unavailable")
@@ -147,6 +198,7 @@ def demo_login(request: Request, db: Session = Depends(get_db)) -> TokenResponse
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    _check_auth_endpoint_limit(request, "refresh")
     token = db.scalar(
         select(AuthToken).where(
             AuthToken.token_hash == hash_opaque_token(payload.refresh_token),
@@ -236,8 +288,9 @@ def forgot_password(
     request: Request,
     db: Session = Depends(get_db),
 ) -> ForgotPasswordResponse:
-    generic = "If an account exists for this email, password reset instructions have been created."
     email = str(payload.email).strip().lower()
+    _check_auth_endpoint_limit(request, "forgot_password", email)
+    generic = "If an account exists for this email, password reset instructions have been created."
     user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
     if not user:
         return ForgotPasswordResponse(message=generic)
@@ -274,6 +327,7 @@ def forgot_password(
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
 def reset_password(payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)) -> None:
+    _check_auth_endpoint_limit(request, "reset_password")
     token = db.scalar(
         select(AuthToken).where(
             AuthToken.token_hash == hash_opaque_token(payload.token),

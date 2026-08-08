@@ -15,6 +15,16 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 def _split_csv(value: str) -> list[str]:
     return [item.strip().rstrip("/") for item in value.split(",") if item.strip()]
 
@@ -30,9 +40,9 @@ class Settings:
     cors_origins: str = os.getenv("CORS_ORIGINS", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "30"))
-    refresh_token_days: int = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
-    password_reset_minutes: int = int(os.getenv("PASSWORD_RESET_MINUTES", "30"))
+    access_token_minutes: int = _env_int("ACCESS_TOKEN_MINUTES", 30)
+    refresh_token_days: int = _env_int("REFRESH_TOKEN_DAYS", 30)
+    password_reset_minutes: int = _env_int("PASSWORD_RESET_MINUTES", 30)
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv("EMAIL_FROM", "Vireqo <onboarding@resend.dev>")
 
@@ -40,6 +50,16 @@ class Settings:
     # PostgreSQL/production should use Alembic migrations instead.
     auto_create_tables_env: str = os.getenv("AUTO_CREATE_TABLES", "")
     seed_demo_data_env: str = os.getenv("SEED_DEMO_DATA", "")
+
+    # Security / abuse protection. These are in-process limits; use Redis later
+    # when running multiple backend instances.
+    rate_limit_enabled: bool = _env_bool("RATE_LIMIT_ENABLED", True)
+    api_rate_limit_max_requests: int = _env_int("API_RATE_LIMIT_MAX_REQUESTS", 300)
+    api_rate_limit_window_seconds: int = _env_int("API_RATE_LIMIT_WINDOW_SECONDS", 60)
+    auth_rate_limit_max_attempts: int = _env_int("AUTH_RATE_LIMIT_MAX_ATTEMPTS", 5)
+    auth_rate_limit_window_seconds: int = _env_int("AUTH_RATE_LIMIT_WINDOW_SECONDS", 900)
+    auth_endpoint_rate_limit_max_requests: int = _env_int("AUTH_ENDPOINT_RATE_LIMIT_MAX_REQUESTS", 20)
+    auth_endpoint_rate_limit_window_seconds: int = _env_int("AUTH_ENDPOINT_RATE_LIMIT_WINDOW_SECONDS", 300)
 
     @property
     def is_development(self) -> bool:
@@ -57,8 +77,10 @@ class Settings:
     def allowed_origins(self) -> list[str]:
         origins = [self.frontend_url, "http://127.0.0.1:3000"]
         origins.extend(_split_csv(self.cors_origins))
-        # Preserve order while removing duplicates.
-        return list(dict.fromkeys(origin for origin in origins if origin))
+        origins = list(dict.fromkeys(origin for origin in origins if origin))
+        if self.is_production:
+            return [origin for origin in origins if origin != "*" and origin.startswith("https://")]
+        return origins
 
     @property
     def should_auto_create_tables(self) -> bool:
