@@ -690,7 +690,13 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
           onMouseDown={handleBackdrop}
         >
           <motion.section
-            className="command-center"
+            className="command-center command-center-panel"
+            style={{
+              maxHeight: "calc(100dvh - 40px)",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
             initial={{ opacity: 0, y: -18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -18, scale: 0.98 }}
@@ -733,7 +739,17 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
               </button>
             </div>
 
-            {activeMode === "commands" && (
+            <div
+              className="command-center-scroll"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                paddingBottom: 16,
+              }}
+            >
+              {activeMode === "commands" && (
               <>
                 <div className="command-center-input">
                   <Search size={18} />
@@ -905,13 +921,13 @@ export function CommandCenter({ open, onClose, canViewActivity, workspaceName }:
               />
             )}
 
-            {activeMode === "history" && (
-              <AIHistoryPanel
-                version={historyVersion}
-                onUseCommand={handleUseHistoryCommand}
-              />
-            )}
-
+              {activeMode === "history" && (
+                <AIHistoryPanel
+                  version={historyVersion}
+                  onUseCommand={handleUseHistoryCommand}
+                />
+              )}
+            </div>
 
             <div className="command-center-footer">
               <span>↑ ↓ to navigate</span>
