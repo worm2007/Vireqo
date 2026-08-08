@@ -18,7 +18,7 @@ from .middleware import (
 from .routers import account, analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
 from .seed import seed_demo_data
 
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 
 
 @asynccontextmanager
@@ -35,7 +35,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=API_VERSION,
-    description="Production-ready backend APIs for Vireqo: auth, CRM, AI workspace, analytics, tasks, privacy, real-time events and PostgreSQL deployment checks.",
+    description="Production-ready backend APIs for Vireqo: auth, CRM, AI workspace, analytics, tasks, privacy, real-time events, transactional email and PostgreSQL deployment checks.",
     lifespan=lifespan,
 )
 

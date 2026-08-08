@@ -35,7 +35,7 @@ from ..security import (
     verify_password,
 )
 from ..services.audit import record_audit
-from ..services.email import send_email_verification_email, send_password_reset_email
+from ..services.email import EmailSendResult, send_email_verification_email, send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -72,6 +72,7 @@ def issue_token_pair(db: Session, user: User) -> TokenResponse:
         refresh_token=raw_refresh,
         expires_in=settings.access_token_minutes * 60,
         user=UserPublic.model_validate(user),
+        email_verification_required=settings.require_email_verification and not user.is_email_verified,
     )
 
 
@@ -82,20 +83,25 @@ def revoke_user_tokens(db: Session, user_id: str, purpose: str | None = None) ->
     db.execute(update(AuthToken).where(*conditions).values(revoked_at=utcnow()))
 
 
-def create_email_verification_request(db: Session, user: User) -> tuple[str, str, bool]:
+def create_email_verification_request(db: Session, user: User) -> tuple[str, str, EmailSendResult]:
     revoke_user_tokens(db, user.id, "email_verification")
     raw_token = generate_opaque_token()
+    token_hash = hash_opaque_token(raw_token)
     db.add(
         AuthToken(
             user_id=user.id,
             purpose="email_verification",
-            token_hash=hash_opaque_token(raw_token),
+            token_hash=token_hash,
             expires_at=utcnow() + timedelta(hours=settings.email_verification_hours),
         )
     )
     verification_url = f"{settings.frontend_url}/verify-email?token={raw_token}"
-    sent = send_email_verification_email(recipient=user.email, verification_url=verification_url)
-    return raw_token, verification_url, sent
+    result = send_email_verification_email(
+        recipient=user.email,
+        verification_url=verification_url,
+        token_hash=token_hash,
+    )
+    return raw_token, verification_url, result
 
 
 def _too_many_requests(retry_after_seconds: int) -> HTTPException:
@@ -170,8 +176,14 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     user = load_user(db, user.id)
     assert user is not None
     response = issue_token_pair(db, user)
-    verification_token, verification_url, verification_sent = create_email_verification_request(db, user)
-    if settings.is_development and not verification_sent:
+    verification_token, verification_url, verification_result = create_email_verification_request(db, user)
+    if settings.require_email_verification and settings.is_production and not verification_result.sent:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email verification is temporarily unavailable. Please try again in a few minutes.",
+        )
+    if settings.is_development and not verification_result.sent:
         response.email_verification_token = verification_token
         response.email_verification_url = verification_url
     record_audit(
@@ -330,23 +342,24 @@ def forgot_password(
             expires_at=utcnow() + timedelta(minutes=settings.password_reset_minutes),
         )
     )
+    token_hash = hash_opaque_token(raw_token)
     reset_url = f"{settings.frontend_url}/reset-password?token={raw_token}"
-    sent = send_password_reset_email(recipient=user.email, reset_url=reset_url)
+    delivery = send_password_reset_email(recipient=user.email, reset_url=reset_url, token_hash=token_hash)
     record_audit(
         db,
         action="auth.password_reset_requested",
         user=user,
         entity_type="user",
         entity_id=user.id,
-        details={"email_sent": sent},
+        details={"email_sent": delivery.sent, "email_provider": delivery.provider},
         request=request,
     )
     db.commit()
 
     return ForgotPasswordResponse(
         message=generic,
-        reset_token=raw_token if settings.is_development and not sent else None,
-        reset_url=reset_url if settings.is_development and not sent else None,
+        reset_token=raw_token if settings.is_development and not delivery.sent else None,
+        reset_url=reset_url if settings.is_development and not delivery.sent else None,
     )
 
 
@@ -363,21 +376,22 @@ def resend_verification(
     if not user or user.is_email_verified:
         return EmailVerificationResponse(message=generic)
 
-    verification_token, verification_url, verification_sent = create_email_verification_request(db, user)
+    verification_token, verification_url, verification_result = create_email_verification_request(db, user)
     record_audit(
         db,
         action="auth.email_verification_requested",
         user=user,
         entity_type="user",
         entity_id=user.id,
-        details={"email_sent": verification_sent},
+        details={"email_sent": verification_result.sent, "email_provider": verification_result.provider},
         request=request,
     )
     db.commit()
     return EmailVerificationResponse(
         message=generic,
-        verification_token=verification_token if settings.is_development and not verification_sent else None,
-        verification_url=verification_url if settings.is_development and not verification_sent else None,
+        verification_token=verification_token if settings.is_development and not verification_result.sent else None,
+        verification_url=verification_url if settings.is_development and not verification_result.sent else None,
+        email_sent=verification_result.sent if settings.is_development else None,
     )
 
 

@@ -52,6 +52,8 @@ def main() -> None:
     auto_create_tables = _env_bool("AUTO_CREATE_TABLES", False)
     seed_demo_data = _env_bool("SEED_DEMO_DATA", False)
     require_email_verification = _env_bool("REQUIRE_EMAIL_VERIFICATION", False)
+    resend_api_key = os.getenv("RESEND_API_KEY", "")
+    email_from = os.getenv("EMAIL_FROM", "")
 
     if environment in {"production", "prod"}:
         if not secret_key or secret_key == PLACEHOLDER_SECRET or len(secret_key) < 32:
@@ -79,8 +81,12 @@ def main() -> None:
             fail("SEED_DEMO_DATA must be false in production.")
         if not rate_limit_enabled:
             warn("RATE_LIMIT_ENABLED=false. This is not recommended in production.")
+        if not resend_api_key or not email_from:
+            if require_email_verification:
+                fail("RESEND_API_KEY and EMAIL_FROM are required when REQUIRE_EMAIL_VERIFICATION=true.")
+            warn("RESEND_API_KEY or EMAIL_FROM is empty. Password reset and verification emails will not send.")
         if not require_email_verification:
-            warn("REQUIRE_EMAIL_VERIFICATION=false. Enable it before public launch.")
+            warn("REQUIRE_EMAIL_VERIFICATION=false. Enable it after Resend email delivery is tested.")
         if not groq_api_key:
             warn("GROQ_API_KEY is empty. AI features will be limited or fail.")
 

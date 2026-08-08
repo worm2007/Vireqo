@@ -20,6 +20,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [created, setCreated] = useState(false);
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
+  const [verificationRequired, setVerificationRequired] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -32,6 +33,7 @@ export default function SignupPage() {
     }
     try {
       const session = await register(form);
+      setVerificationRequired(Boolean(session.email_verification_required));
       setVerificationUrl(session.email_verification_url ?? null);
       setCreated(true);
     } catch (err) {
@@ -56,18 +58,24 @@ export default function SignupPage() {
           <MailCheck size={30} />
           <strong>Workspace created</strong>
           <p>
-            We created a verification link for <b>{form.email}</b>. In development mode, Vireqo can show the local link here when email sending is not configured.
+            We sent a verification link to <b>{form.email}</b>. Open the email, verify your address, then sign in to Vireqo.
           </p>
           {verificationUrl ? (
             <Link className="button button-dark full-button" href={verificationUrl}>
               Open local verification link <ArrowRight size={17} />
             </Link>
           ) : (
-            <p className="auth-legal">Check your inbox for the verification email.</p>
+            <p className="auth-legal">Check your inbox and spam folder for the Vireqo verification email.</p>
           )}
-          <button className="demo-login-button auth-secondary-action" type="button" onClick={() => router.replace("/dashboard")}>
-            Continue to dashboard
-          </button>
+          {verificationRequired ? (
+            <Link className="demo-login-button auth-secondary-action" href="/login">
+              Go to sign in
+            </Link>
+          ) : (
+            <button className="demo-login-button auth-secondary-action" type="button" onClick={() => router.replace("/dashboard")}>
+              Continue to dashboard
+            </button>
+          )}
         </div>
       ) : (
         <form className="auth-form" onSubmit={submit}>

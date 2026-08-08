@@ -30,6 +30,7 @@ export type AuthSession = {
   token_type: "bearer";
   expires_in: number;
   user: User;
+  email_verification_required?: boolean;
   email_verification_token?: string | null;
   email_verification_url?: string | null;
 };
@@ -414,6 +415,7 @@ export type EmailVerificationResult = {
   message: string;
   verification_token?: string | null;
   verification_url?: string | null;
+  email_sent?: boolean | null;
 };
 export type AuditLog = {
   id: string;

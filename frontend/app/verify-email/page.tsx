@@ -67,8 +67,8 @@ export default function VerifyEmailPage() {
           <ShieldCheck size={30} />
           <strong>Email verified</strong>
           <p>{message || "Your email address is now verified."}</p>
-          <Link className="button button-dark full-button" href="/dashboard">
-            Open dashboard <ArrowRight size={17} />
+          <Link className="button button-dark full-button" href="/login">
+            Sign in to Vireqo <ArrowRight size={17} />
           </Link>
         </div>
       ) : token && error ? (
@@ -88,6 +88,7 @@ export default function VerifyEmailPage() {
           </label>
           {message && <div className="auth-inline-success"><CheckCircle2 size={16} /> {message}</div>}
           {verificationUrl && <Link className="button button-dark full-button" href={verificationUrl}>Open local verification link <ArrowRight size={17} /></Link>}
+          {!verificationUrl && message && <p className="auth-legal">Check your inbox and spam folder for the new verification email.</p>}
           {error && !token && <p className="form-error">{error}</p>}
           <button className="demo-login-button" type="submit" disabled={resending}>
             {resending ? "Creating link..." : "Resend verification link"}

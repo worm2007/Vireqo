@@ -203,7 +203,9 @@ export async function register(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  persistSession(session);
+  if (!session.email_verification_required) {
+    persistSession(session);
+  }
   return session;
 }
 

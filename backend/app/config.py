@@ -40,13 +40,17 @@ class Settings:
     cors_origins: str = os.getenv("CORS_ORIGINS", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    access_token_minutes: int = _env_int("ACCESS_TOKEN_MINUTES", 30)
-    refresh_token_days: int = _env_int("REFRESH_TOKEN_DAYS", 30)
+    access_token_minutes: int = _env_int("ACCESS_TOKEN_EXPIRE_MINUTES", _env_int("ACCESS_TOKEN_MINUTES", 30))
+    refresh_token_days: int = _env_int("REFRESH_TOKEN_EXPIRE_DAYS", _env_int("REFRESH_TOKEN_DAYS", 30))
     password_reset_minutes: int = _env_int("PASSWORD_RESET_MINUTES", 30)
     email_verification_hours: int = _env_int("EMAIL_VERIFICATION_HOURS", 24)
     require_email_verification: bool = _env_bool("REQUIRE_EMAIL_VERIFICATION", False)
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv("EMAIL_FROM", "Vireqo <onboarding@resend.dev>")
+    email_reply_to: str = os.getenv("EMAIL_REPLY_TO", "")
+    support_email: str = os.getenv("SUPPORT_EMAIL", "support@vireqo.in")
+    email_logo_url: str = os.getenv("EMAIL_LOGO_URL", "")
+    email_timeout_seconds: int = _env_int("EMAIL_TIMEOUT_SECONDS", 10)
 
     # SQLite can auto-create tables during local development for fast onboarding.
     # PostgreSQL/production should use Alembic migrations instead.

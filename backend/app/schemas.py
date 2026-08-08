@@ -127,6 +127,7 @@ class EmailVerificationResponse(BaseModel):
     message: str
     verification_token: str | None = None
     verification_url: str | None = None
+    email_sent: bool | None = None
 
 
 class VerifyEmailRequest(BaseModel):
@@ -155,6 +156,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserPublic
+    email_verification_required: bool = False
     email_verification_token: str | None = None
     email_verification_url: str | None = None
 
