@@ -49,6 +49,30 @@ class UserPublic(UserSummary):
     business: BusinessPublic
 
 
+class UserProfileUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class AccountExportSummary(BaseModel):
+    generated_at: datetime
+    users: int
+    leads: int
+    conversations: int
+    appointments: int
+    tasks: int
+    audit_logs: int
+
+
+class AccountDeleteRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    confirmation: str = Field(min_length=1, max_length=80)
+
+
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr

@@ -14,7 +14,7 @@ from .middleware import (
     SecurityHeadersMiddleware,
     install_exception_handlers,
 )
-from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
+from .routers import account, analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
 from .seed import seed_demo_data
 
 API_VERSION = "0.4.3"
@@ -55,6 +55,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(account.router, prefix="/api/v1")
 app.include_router(businesses.router, prefix="/api/v1")
 app.include_router(team.router, prefix="/api/v1")
 app.include_router(leads.router, prefix="/api/v1")

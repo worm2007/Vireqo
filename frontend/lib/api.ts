@@ -1,4 +1,6 @@
 import type {
+  AccountDataExport,
+  AccountExportSummary,
   AuditLog,
   Analytics,
   Appointment,
@@ -224,6 +226,32 @@ export async function getCurrentUser(): Promise<User> {
   browserStorage()?.setItem(USER_KEY, JSON.stringify(user));
   return user;
 }
+
+export async function updateProfile(name: string): Promise<User> {
+  const user = await authenticatedRequest<User>("/account/profile", {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  browserStorage()?.setItem(USER_KEY, JSON.stringify(user));
+  return user;
+}
+
+export async function getAccountExportSummary(): Promise<AccountExportSummary> {
+  return authenticatedRequest<AccountExportSummary>("/account/export/summary");
+}
+
+export async function getAccountExport(): Promise<AccountDataExport> {
+  return authenticatedRequest<AccountDataExport>("/account/export");
+}
+
+export async function deleteAccount(payload: { password: string; confirmation: string }): Promise<void> {
+  await authenticatedRequest<void>("/account", {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+  });
+  clearSession();
+}
+
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   await authenticatedRequest<void>("/auth/change-password", {

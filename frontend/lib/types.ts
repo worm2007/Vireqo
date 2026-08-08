@@ -486,3 +486,25 @@ export type CommandHistoryEntry = {
   createdAt: string;
   preview?: string;
 };
+
+export type AccountExportSummary = {
+  generated_at: string;
+  users: number;
+  leads: number;
+  conversations: number;
+  appointments: number;
+  tasks: number;
+  audit_logs: number;
+};
+
+export type AccountDataExport = {
+  generated_at: string;
+  format: string;
+  business: Business;
+  users: TeamMember[];
+  leads: Lead[];
+  appointments: Appointment[];
+  conversations: Conversation[];
+  tasks: Task[];
+  audit_logs: AuditLog[];
+};
