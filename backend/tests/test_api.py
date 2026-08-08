@@ -81,5 +81,18 @@ def test_health_exposes_current_backend_version() -> None:
         response = client.get("/health")
         assert response.status_code == 200
         payload = response.json()
-        assert payload["version"] == "0.4.5"
+        assert payload["version"] == "0.5.0"
         assert payload["rate_limit_enabled"] is True
+
+
+
+def test_database_health_endpoint() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health/db")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "ready"
+        assert payload["version"] == "0.5.0"
+        assert payload["ok"] is True
+        assert payload["kind"] in {"sqlite", "postgresql"}
+        assert isinstance(payload["tables"], int)

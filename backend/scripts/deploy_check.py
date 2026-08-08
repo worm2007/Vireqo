@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 PLACEHOLDER_SECRET = "dev-secret-change-before-production"
@@ -61,6 +62,8 @@ def main() -> None:
             fail("Production must use PostgreSQL, not SQLite.")
         if not database_url.startswith(("postgres://", "postgresql://", "postgresql+psycopg://")):
             fail("DATABASE_URL must be a PostgreSQL URL in production.")
+        if not (Path("alembic.ini").exists() and Path("alembic").exists()):
+            fail("Alembic files are missing. Production database migrations cannot run.")
 
         _require_https("FRONTEND_URL", frontend_url)
         _require_https("BACKEND_PUBLIC_URL", backend_public_url)

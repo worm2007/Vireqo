@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -27,6 +27,32 @@ def normalize_database_url(database_url: str) -> str:
     return database_url
 
 
+def database_kind(database_url: str | None = None) -> str:
+    """Return a short public label for the configured database."""
+    value = normalize_database_url(database_url or settings.database_url)
+    if value.startswith("sqlite"):
+        return "sqlite"
+    if value.startswith(("postgresql", "postgres")):
+        return "postgresql"
+    return "unknown"
+
+
+def safe_database_label(database_url: str | None = None) -> str:
+    """Return a redacted database target label safe for logs and health output."""
+    value = normalize_database_url(database_url or settings.database_url)
+    try:
+        parsed = make_url(value)
+    except Exception:
+        return database_kind(value)
+
+    if parsed.drivername.startswith("sqlite"):
+        return "sqlite"
+
+    host = parsed.host or "configured-host"
+    database = parsed.database or "configured-db"
+    return f"{parsed.drivername}://{host}/{database}"
+
+
 def create_database_engine(database_url: str | URL):
     if isinstance(database_url, str):
         database_url = normalize_database_url(database_url)
@@ -46,6 +72,25 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def check_database_connection() -> dict[str, str | bool | int]:
+    """Run a fast database readiness check.
+
+    This is intentionally lightweight so it can be used by health checks and
+    deployment scripts without triggering model imports or heavy queries.
+    """
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        inspector = inspect(connection)
+        table_count = len(inspector.get_table_names())
+
+    return {
+        "ok": True,
+        "kind": database_kind(),
+        "target": safe_database_label(),
+        "tables": table_count,
+    }
 
 
 def run_sqlite_compatibility_patches() -> None:
