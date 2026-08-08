@@ -1,6 +1,6 @@
 # Vireqo Security Hardening
 
-Sprint 4.2 adds the first production security layer for the backend.
+Sprint 4.2 added the first production security layer; Sprint 4.5 adds production-readiness checks and safer local sharing rules.
 
 ## Included
 
@@ -17,6 +17,14 @@ Sprint 4.2 adds the first production security layer for the backend.
 - Login brute-force protection by IP, email and IP/email pair
 - Safer production CORS validation in `deploy_check.py`
 - Generic 500 errors in production while keeping detailed errors in development
+
+
+## Sprint 4.5 additions
+
+- Production deploy check now rejects SQLite, wildcard CORS, non-HTTPS public URLs, demo seeding and auto-create tables in production.
+- `.gitignore` and `.dockerignore` now protect local databases, secrets, virtualenv files, caches and generated ZIPs.
+- `scripts/create_backend_release_zip.py` creates a clean backend ZIP without `.env`, `.venv`, `vireqo.db`, caches or macOS metadata.
+- `scripts/fix_demo_account.py` repairs older local demo users from `demo@vireqo.local` to `demo@vireqo.app`.
 
 ## Important limitation
 

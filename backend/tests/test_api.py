@@ -73,3 +73,13 @@ def test_complete_mvp_flow() -> None:
         data = analytics.json()
         assert data["total_leads"] >= 7
         assert data["appointments"] >= 2
+
+
+
+def test_health_exposes_current_backend_version() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["version"] == "0.4.5"
+        assert payload["rate_limit_enabled"] is True

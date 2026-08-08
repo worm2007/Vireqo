@@ -1,17 +1,21 @@
 # Backend Deployment
 
+Sprint 4.5 hardens the backend for production-style testing before public deployment.
+
 ## Required production environment variables
 
 ```env
 ENVIRONMENT=production
-SECRET_KEY=<strong-random-value>
+SECRET_KEY=<strong-random-value-at-least-32-characters>
 DATABASE_URL=<postgresql-url>
 FRONTEND_URL=https://your-frontend-domain.vercel.app
 BACKEND_PUBLIC_URL=https://your-backend-domain.onrender.com
 CORS_ORIGINS=https://your-frontend-domain.vercel.app
-GROQ_API_KEY=<optional-but-needed-for-ai>
+GROQ_API_KEY=<needed-for-ai-features>
 AUTO_CREATE_TABLES=false
 SEED_DEMO_DATA=false
+REQUIRE_EMAIL_VERIFICATION=true
+RATE_LIMIT_ENABLED=true
 ```
 
 ## Start command
@@ -34,8 +38,9 @@ Expected production response:
 {
   "status": "healthy",
   "environment": "production",
-  "version": "0.4.0",
-  "database": "postgresql"
+  "version": "0.4.5",
+  "database": "postgresql",
+  "rate_limit_enabled": true
 }
 ```
 
@@ -44,7 +49,22 @@ Expected production response:
 ```bash
 cd backend
 source .venv/bin/activate
-ENVIRONMENT=production python scripts/deploy_check.py
-python scripts/check_database.py
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+ENVIRONMENT=production \
+SECRET_KEY=replace-with-a-strong-32-character-secret \
+DATABASE_URL=postgresql://user:pass@localhost:5432/vireqo \
+FRONTEND_URL=https://example.com \
+BACKEND_PUBLIC_URL=https://api.example.com \
+CORS_ORIGINS=https://example.com \
+AUTO_CREATE_TABLES=false \
+SEED_DEMO_DATA=false \
+REQUIRE_EMAIL_VERIFICATION=true \
+python scripts/deploy_check.py
+```
+
+## Clean backend ZIP
+
+Never share a ZIP that contains `.env`, `.venv`, `vireqo.db`, caches or macOS metadata. Create a clean backend release with:
+
+```bash
+python scripts/create_backend_release_zip.py
 ```
