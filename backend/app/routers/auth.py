@@ -136,7 +136,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 @router.post("/demo", response_model=TokenResponse)
 def demo_login(request: Request, db: Session = Depends(get_db)) -> TokenResponse:
-    user = db.scalar(select(User).options(selectinload(User.business)).where(User.email == "demo@vireqo.local"))
+    user = db.scalar(select(User).options(selectinload(User.business)).where(User.email == "demo@vireqo.app"))
     if not user:
         raise HTTPException(status_code=404, detail="Demo account is unavailable")
     response = issue_token_pair(db, user)

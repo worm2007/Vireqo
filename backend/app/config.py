@@ -8,6 +8,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "Vireqo API")
@@ -23,9 +30,30 @@ class Settings:
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv("EMAIL_FROM", "Vireqo <onboarding@resend.dev>")
 
+    # SQLite can auto-create tables during local development for fast onboarding.
+    # PostgreSQL/production should use Alembic migrations instead.
+    auto_create_tables_env: str = os.getenv("AUTO_CREATE_TABLES", "")
+    seed_demo_data_env: str = os.getenv("SEED_DEMO_DATA", "")
+
     @property
     def is_development(self) -> bool:
         return self.environment.lower() in {"development", "dev", "local", "test"}
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
+
+    @property
+    def should_auto_create_tables(self) -> bool:
+        if self.auto_create_tables_env.strip():
+            return _env_bool("AUTO_CREATE_TABLES", False)
+        return self.is_development and self.is_sqlite
+
+    @property
+    def should_seed_demo_data(self) -> bool:
+        if self.seed_demo_data_env.strip():
+            return _env_bool("SEED_DEMO_DATA", False)
+        return self.is_development
 
 
 settings = Settings()

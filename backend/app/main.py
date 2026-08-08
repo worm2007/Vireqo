@@ -13,15 +13,17 @@ from .seed import seed_demo_data
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        seed_demo_data(db)
+    if settings.should_auto_create_tables:
+        Base.metadata.create_all(bind=engine)
+    if settings.should_seed_demo_data:
+        with SessionLocal() as db:
+            seed_demo_data(db)
     yield
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
+    version="0.3.0",
     description="Authentication, CRM, conversations, appointments and analytics APIs for Vireqo.",
     lifespan=lifespan,
 )
@@ -50,9 +52,9 @@ app.include_router(realtime.router, prefix="/api/v1")
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"name": "Vireqo API", "status": "online", "version": "0.2.0", "docs": "/docs"}
+    return {"name": "Vireqo API", "status": "online", "version": "0.3.0", "docs": "/docs"}
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "healthy", "environment": settings.environment, "version": "0.2.0"}
+    return {"status": "healthy", "environment": settings.environment, "version": "0.3.0", "database": "sqlite" if settings.is_sqlite else "postgresql"}
