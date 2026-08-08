@@ -216,6 +216,53 @@ export type WeeklyReport = {
 };
 
 
+export type PipelineAutomationRule = {
+  id: string;
+  title: string;
+  description: string;
+  severity: "urgent" | "high" | "medium" | "low" | string;
+  trigger_count: number;
+  recommendation: string;
+};
+
+export type PipelineAutomationAction = {
+  id: string;
+  lead_id: string;
+  lead_name: string;
+  company: string;
+  status: Lead["status"] | string;
+  priority: "urgent" | "high" | "medium" | "low" | string;
+  rule_id: string;
+  rule_label: string;
+  title: string;
+  description: string;
+  suggested_status?: Lead["status"] | null;
+  cta_label: string;
+  href: string;
+  estimated_impact: string;
+  reason: string;
+  due_label: string;
+  latest_touch_at?: string | null;
+};
+
+export type PipelineAutomation = {
+  generated_at: string;
+  summary: {
+    total_actions: number;
+    urgent_count: number;
+    high_priority_count: number;
+    stale_count: number;
+    suggested_stage_moves: number;
+    meetings_to_confirm: number;
+    followups_due: number;
+    automation_health: number;
+    headline: string;
+  };
+  rules: PipelineAutomationRule[];
+  actions: PipelineAutomationAction[];
+};
+
+
 export type Appointment = {
   id: string;
   lead_id?: string | null;

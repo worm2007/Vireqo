@@ -14,12 +14,14 @@ from ..schemas import (
     LeadIntelligenceSummary,
     LeadPrediction,
     LeadPublic,
+    PipelineAutomationResponse,
     RevenueForecastResponse,
     WeeklyReportResponse,
 )
 from ..security import get_current_user
 from ..services.executive_insights import build_executive_insights
 from ..services.lead_scoring import calculate_lead_intelligence
+from ..services.pipeline_automation import build_pipeline_automation
 from ..services.revenue_forecast import build_revenue_forecast
 from ..services.weekly_report import build_weekly_report
 
@@ -94,6 +96,15 @@ def weekly_report(
 ) -> WeeklyReportResponse:
     """Return a weekly executive report with highlights, risks and action plan."""
     return WeeklyReportResponse.model_validate(build_weekly_report(db, current_user))
+
+
+@router.get("/pipeline-automation", response_model=PipelineAutomationResponse)
+def pipeline_automation(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PipelineAutomationResponse:
+    """Return generated pipeline automation rules and next-best actions."""
+    return build_pipeline_automation(db, current_user)
 
 
 @router.get("/lead-intelligence", response_model=LeadIntelligenceResponse)

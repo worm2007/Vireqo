@@ -3,6 +3,7 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { DealDetailDrawer } from "@/components/DealDetailDrawer";
 import { PipelineKanban } from "@/components/PipelineKanban";
+import { PipelineAutomationPanel } from "@/components/PipelineAutomationPanel";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import {
   createLead,
@@ -10,11 +11,12 @@ import {
   getLeadDetail,
   getLeadIntelligence,
   getLeads,
+  getPipelineAutomation,
   getRevenueForecast,
   updateLead,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Lead, LeadDetail, LeadIntelligence, RevenueForecast } from "@/lib/types";
+import type { Lead, LeadDetail, LeadIntelligence, PipelineAutomation, RevenueForecast } from "@/lib/types";
 import {
   AlertTriangle,
   BrainCircuit,
@@ -86,6 +88,7 @@ export default function OpportunitiesPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [intelligence, setIntelligence] = useState<LeadIntelligence | null>(null);
   const [forecast, setForecast] = useState<RevenueForecast | null>(null);
+  const [automation, setAutomation] = useState<PipelineAutomation | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState("");
@@ -113,7 +116,7 @@ export default function OpportunitiesPage() {
     setError("");
 
     try {
-      const [items, predictive, revenue] = await Promise.all([
+      const [items, predictive, revenue, pipelineAutomation] = await Promise.all([
         getLeads({
           search,
           status,
@@ -122,11 +125,13 @@ export default function OpportunitiesPage() {
         }),
         getLeadIntelligence().catch(() => null),
         getRevenueForecast().catch(() => null),
+        getPipelineAutomation().catch(() => null),
       ]);
 
       setLeads(items);
       setIntelligence(predictive);
       setForecast(revenue);
+      setAutomation(pipelineAutomation);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load opportunities",
@@ -291,6 +296,14 @@ export default function OpportunitiesPage() {
 
     try {
       const updated = await updateLeadStatus(lead.id, nextStatus);
+      const [predictive, revenue, pipelineAutomation] = await Promise.all([
+        getLeadIntelligence().catch(() => null),
+        getRevenueForecast().catch(() => null),
+        getPipelineAutomation().catch(() => null),
+      ]);
+      setIntelligence(predictive);
+      setForecast(revenue);
+      setAutomation(pipelineAutomation);
 
       setLeads((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
@@ -459,6 +472,14 @@ export default function OpportunitiesPage() {
           </div>
         </section>
       )}
+
+      <PipelineAutomationPanel
+        automation={automation}
+        leads={leads}
+        onOpenLead={openDetails}
+        onChangeStatus={changeStatus}
+      />
+
 
       {showCreate && (
         <form className="dashboard-form-card" onSubmit={submitCreate}>

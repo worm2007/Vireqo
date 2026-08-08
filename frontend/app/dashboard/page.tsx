@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/components/DashboardShell";
+import { PipelineAutomationPanel } from "@/components/PipelineAutomationPanel";
 import { useWorkspaceEvent } from "@/hooks/useWorkspaceRealtime";
 import { LeadTable } from "@/components/LeadTable";
 import {
@@ -9,11 +10,12 @@ import {
   getCurrentUser,
   getExecutiveInsights,
   getLeads,
+  getPipelineAutomation,
   getRevenueForecast,
   getWeeklyReport,
   updateLeadStatus,
 } from "@/lib/api";
-import type { Analytics, ExecutiveInsights, Lead, RevenueForecast, User, WeeklyReport } from "@/lib/types";
+import type { Analytics, ExecutiveInsights, Lead, PipelineAutomation, RevenueForecast, User, WeeklyReport } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowDownRight,
@@ -55,6 +57,7 @@ export default function DashboardPage() {
   const [insights, setInsights] = useState<ExecutiveInsights | null>(null);
   const [forecast, setForecast] = useState<RevenueForecast | null>(null);
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
+  const [automation, setAutomation] = useState<PipelineAutomation | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
@@ -62,12 +65,13 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [currentUser, summary, executive, revenue, weekly, items] = await Promise.all([
+      const [currentUser, summary, executive, revenue, weekly, pipelineAutomation, items] = await Promise.all([
         getCurrentUser(),
         getAnalytics(),
         getExecutiveInsights(),
         getRevenueForecast(),
         getWeeklyReport(),
+        getPipelineAutomation(),
         getLeads({ limit: 100 }),
       ]);
       setUser(currentUser);
@@ -75,6 +79,7 @@ export default function DashboardPage() {
       setInsights(executive);
       setForecast(revenue);
       setWeeklyReport(weekly);
+      setAutomation(pipelineAutomation);
       setLeads(items);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load the dashboard";
@@ -100,16 +105,18 @@ export default function DashboardPage() {
     setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status } : item));
     try {
       await updateLeadStatus(lead.id, status);
-      const [summary, executive, revenue, weekly] = await Promise.all([
+      const [summary, executive, revenue, weekly, pipelineAutomation] = await Promise.all([
         getAnalytics(),
         getExecutiveInsights(),
         getRevenueForecast(),
         getWeeklyReport(),
+        getPipelineAutomation(),
       ]);
       setAnalytics(summary);
       setInsights(executive);
       setForecast(revenue);
       setWeeklyReport(weekly);
+      setAutomation(pipelineAutomation);
     } catch {
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: previous } : item));
       setError("Status update failed. The previous value was restored.");
@@ -125,7 +132,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      {!analytics || !insights || !forecast || !weeklyReport ? (
+      {!analytics || !insights || !forecast || !weeklyReport || !automation ? (
         <div className="dashboard-loading"><LoaderCircle className="spin" size={28} /><strong>Preparing your executive intelligence</strong><p>{error || "Analysing your workspace…"}</p></div>
       ) : (
         <>
@@ -349,6 +356,14 @@ export default function DashboardPage() {
               </div>
             </section>
           </div>
+
+
+          <PipelineAutomationPanel
+            automation={automation}
+            leads={leads}
+            compact
+            onChangeStatus={changeStatus}
+          />
 
 
           <div className="dashboard-insight-grid">

@@ -12,6 +12,7 @@ import type {
   Lead,
   LeadDetail,
   LeadIntelligence,
+  PipelineAutomation,
   RevenueForecast,
   TeamMember,
   User,
@@ -273,6 +274,10 @@ export async function getRevenueForecast(): Promise<RevenueForecast> {
 
 export async function getWeeklyReport(): Promise<WeeklyReport> {
   return authenticatedRequest<WeeklyReport>("/analytics/weekly-report");
+}
+
+export async function getPipelineAutomation(): Promise<PipelineAutomation> {
+  return authenticatedRequest<PipelineAutomation>("/analytics/pipeline-automation");
 }
 
 export async function getLeads(params: {

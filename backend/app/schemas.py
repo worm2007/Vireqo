@@ -378,6 +378,54 @@ class WeeklyReportResponse(BaseModel):
     top_opportunities: list[WeeklyReportOpportunity] = Field(default_factory=list)
 
 
+class PipelineAutomationRule(BaseModel):
+    id: str
+    title: str
+    description: str
+    severity: str
+    trigger_count: int
+    recommendation: str
+
+
+class PipelineAutomationAction(BaseModel):
+    id: str
+    lead_id: str
+    lead_name: str
+    company: str
+    status: str
+    priority: str
+    rule_id: str
+    rule_label: str
+    title: str
+    description: str
+    suggested_status: str | None = None
+    cta_label: str
+    href: str
+    estimated_impact: str
+    reason: str
+    due_label: str
+    latest_touch_at: datetime | None = None
+
+
+class PipelineAutomationSummary(BaseModel):
+    total_actions: int
+    urgent_count: int
+    high_priority_count: int
+    stale_count: int
+    suggested_stage_moves: int
+    meetings_to_confirm: int
+    followups_due: int
+    automation_health: int
+    headline: str
+
+
+class PipelineAutomationResponse(BaseModel):
+    generated_at: datetime
+    summary: PipelineAutomationSummary
+    rules: list[PipelineAutomationRule] = Field(default_factory=list)
+    actions: list[PipelineAutomationAction] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     session_id: str = Field(min_length=6, max_length=120)
     message: str = Field(min_length=1, max_length=4000)
