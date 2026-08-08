@@ -40,6 +40,8 @@ class UserSummary(BaseModel):
     email: str
     role: str
     is_active: bool
+    email_verified_at: datetime | None = None
+    is_email_verified: bool
     created_at: datetime
 
 
@@ -97,6 +99,20 @@ class ForgotPasswordResponse(BaseModel):
     reset_url: str | None = None
 
 
+class EmailVerificationResponse(BaseModel):
+    message: str
+    verification_token: str | None = None
+    verification_url: str | None = None
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=30, max_length=300)
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
 class ResetPasswordRequest(BaseModel):
     token: str = Field(min_length=30, max_length=300)
     new_password: str = Field(min_length=8, max_length=128)
@@ -115,6 +131,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserPublic
+    email_verification_token: str | None = None
+    email_verification_url: str | None = None
 
 
 class TeamMemberCreate(BaseModel):

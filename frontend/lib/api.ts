@@ -7,6 +7,7 @@ import type {
   ChatHistory,
   ChatResponse,
   Conversation,
+  EmailVerificationResult,
   ExecutiveInsights,
   ForgotPasswordResult,
   Lead,
@@ -195,13 +196,13 @@ export async function register(payload: {
   password: string;
   business_name: string;
   industry: string;
-}): Promise<User> {
+}): Promise<AuthSession> {
   const session = await rawRequest<AuthSession>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
   persistSession(session);
-  return session.user;
+  return session;
 }
 
 export async function logout(): Promise<void> {
@@ -245,6 +246,20 @@ export async function resetPassword(token: string, newPassword: string): Promise
     body: JSON.stringify({ token, new_password: newPassword }),
   });
   clearSession();
+}
+
+export async function resendVerification(email: string): Promise<EmailVerificationResult> {
+  return rawRequest<EmailVerificationResult>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyEmail(token: string): Promise<EmailVerificationResult> {
+  return rawRequest<EmailVerificationResult>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
 }
 
 export async function getBusiness(): Promise<Business> {

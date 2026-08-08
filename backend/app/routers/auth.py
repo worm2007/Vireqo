@@ -13,13 +13,16 @@ from ..models import AuthToken, Business, User, utcnow
 from ..rate_limit import auth_endpoint_limiter, auth_failure_limiter, get_client_ip
 from ..schemas import (
     ChangePasswordRequest,
+    EmailVerificationResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest,
+    VerifyEmailRequest,
     TokenResponse,
     UserPublic,
 )
@@ -32,7 +35,7 @@ from ..security import (
     verify_password,
 )
 from ..services.audit import record_audit
-from ..services.email import send_password_reset_email
+from ..services.email import send_email_verification_email, send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -77,6 +80,22 @@ def revoke_user_tokens(db: Session, user_id: str, purpose: str | None = None) ->
     if purpose:
         conditions.append(AuthToken.purpose == purpose)
     db.execute(update(AuthToken).where(*conditions).values(revoked_at=utcnow()))
+
+
+def create_email_verification_request(db: Session, user: User) -> tuple[str, str, bool]:
+    revoke_user_tokens(db, user.id, "email_verification")
+    raw_token = generate_opaque_token()
+    db.add(
+        AuthToken(
+            user_id=user.id,
+            purpose="email_verification",
+            token_hash=hash_opaque_token(raw_token),
+            expires_at=utcnow() + timedelta(hours=settings.email_verification_hours),
+        )
+    )
+    verification_url = f"{settings.frontend_url}/verify-email?token={raw_token}"
+    sent = send_email_verification_email(recipient=user.email, verification_url=verification_url)
+    return raw_token, verification_url, sent
 
 
 def _too_many_requests(retry_after_seconds: int) -> HTTPException:
@@ -151,6 +170,10 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     user = load_user(db, user.id)
     assert user is not None
     response = issue_token_pair(db, user)
+    verification_token, verification_url, verification_sent = create_email_verification_request(db, user)
+    if settings.is_development and not verification_sent:
+        response.email_verification_token = verification_token
+        response.email_verification_url = verification_url
     record_audit(
         db,
         action="auth.register",
@@ -176,6 +199,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     if not user.is_active:
         _record_login_failure(request, email)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive")
+    if settings.require_email_verification and not user.is_email_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Please verify your email before signing in")
 
     _clear_login_failures(request, email)
     response = issue_token_pair(db, user)
@@ -323,6 +348,68 @@ def forgot_password(
         reset_token=raw_token if settings.is_development and not sent else None,
         reset_url=reset_url if settings.is_development and not sent else None,
     )
+
+
+@router.post("/resend-verification", response_model=EmailVerificationResponse)
+def resend_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> EmailVerificationResponse:
+    email = str(payload.email).strip().lower()
+    _check_auth_endpoint_limit(request, "resend_verification", email)
+    generic = "If this email has an unverified Vireqo account, a verification link has been created."
+    user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
+    if not user or user.is_email_verified:
+        return EmailVerificationResponse(message=generic)
+
+    verification_token, verification_url, verification_sent = create_email_verification_request(db, user)
+    record_audit(
+        db,
+        action="auth.email_verification_requested",
+        user=user,
+        entity_type="user",
+        entity_id=user.id,
+        details={"email_sent": verification_sent},
+        request=request,
+    )
+    db.commit()
+    return EmailVerificationResponse(
+        message=generic,
+        verification_token=verification_token if settings.is_development and not verification_sent else None,
+        verification_url=verification_url if settings.is_development and not verification_sent else None,
+    )
+
+
+@router.post("/verify-email", response_model=EmailVerificationResponse)
+def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_db)) -> EmailVerificationResponse:
+    _check_auth_endpoint_limit(request, "verify_email")
+    token = db.scalar(
+        select(AuthToken).where(
+            AuthToken.token_hash == hash_opaque_token(payload.token),
+            AuthToken.purpose == "email_verification",
+            AuthToken.revoked_at.is_(None),
+        )
+    )
+    if not token or aware(token.expires_at) <= utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    user = load_user(db, token.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid verification request")
+
+    user.email_verified_at = user.email_verified_at or utcnow()
+    token.revoked_at = utcnow()
+    record_audit(
+        db,
+        action="auth.email_verified",
+        user=user,
+        entity_type="user",
+        entity_id=user.id,
+        request=request,
+    )
+    db.commit()
+    return EmailVerificationResponse(message="Email verified. You can continue to Vireqo.")
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)

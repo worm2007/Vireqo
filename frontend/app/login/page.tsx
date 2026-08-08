@@ -75,6 +75,7 @@ export default function LoginPage() {
           />
         </label>
         {error && <p className="form-error">{error}</p>}
+        {error.toLowerCase().includes("verify") && <Link className="auth-helper-link" href="/verify-email">Resend verification link</Link>}
         <button className="button button-dark full-button" disabled={loading}>
           {loading ? <><LoaderCircle className="spin" size={18} /> Opening workspace</> : <>Sign in <ArrowRight size={18} /></>}
         </button>

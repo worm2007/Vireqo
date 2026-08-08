@@ -43,6 +43,8 @@ class Settings:
     access_token_minutes: int = _env_int("ACCESS_TOKEN_MINUTES", 30)
     refresh_token_days: int = _env_int("REFRESH_TOKEN_DAYS", 30)
     password_reset_minutes: int = _env_int("PASSWORD_RESET_MINUTES", 30)
+    email_verification_hours: int = _env_int("EMAIL_VERIFICATION_HOURS", 24)
+    require_email_verification: bool = _env_bool("REQUIRE_EMAIL_VERIFICATION", False)
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     email_from: str = os.getenv("EMAIL_FROM", "Vireqo <onboarding@resend.dev>")
 

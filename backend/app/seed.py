@@ -28,6 +28,7 @@ def seed_demo_data(db: Session) -> None:
         name="Demo Founder",
         email="demo@vireqo.app",
         password_hash=hash_password("VireqoDemo123!"),
+        email_verified_at=utcnow(),
     )
     db.add(user)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -46,3 +46,21 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def run_sqlite_compatibility_patches() -> None:
+    """Apply tiny local-only SQLite upgrades for existing developer databases.
+
+    Production databases should use Alembic. This keeps older local SQLite
+    files from crashing after a nullable column is added to the ORM model.
+    """
+    if not settings.is_sqlite:
+        return
+
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        if "users" not in inspector.get_table_names():
+            return
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        if "email_verified_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified_at DATETIME"))

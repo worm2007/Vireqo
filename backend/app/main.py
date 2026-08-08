@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .database import Base, SessionLocal, engine
+from .database import Base, SessionLocal, engine, run_sqlite_compatibility_patches
 from .middleware import (
     ApiRateLimitMiddleware,
     RequestIdMiddleware,
@@ -17,13 +17,14 @@ from .middleware import (
 from .routers import analytics, appointments, audit, auth, businesses, chatbot, conversations, leads, realtime, tasks, team
 from .seed import seed_demo_data
 
-API_VERSION = "0.4.2"
+API_VERSION = "0.4.3"
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if settings.should_auto_create_tables:
         Base.metadata.create_all(bind=engine)
+        run_sqlite_compatibility_patches()
     if settings.should_seed_demo_data:
         with SessionLocal() as db:
             seed_demo_data(db)

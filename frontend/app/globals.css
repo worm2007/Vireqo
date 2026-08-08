@@ -6285,3 +6285,11 @@ button { cursor: pointer; }
     display: none;
   }
 }
+
+/* Sprint 4.3 - account recovery and email verification */
+.auth-verification-card b { color: var(--ink); }
+.auth-secondary-action { margin-top: 12px; }
+.auth-helper-link { display: inline-flex; justify-content: center; width: 100%; margin: -4px 0 12px; color: var(--forest); font-size: 11px; font-weight: 800; }
+.auth-resend-form { margin-top: 14px; border-top: 1px solid rgba(17,17,15,.08); padding-top: 18px; }
+.auth-inline-success { display: flex; align-items: flex-start; gap: 8px; border: 1px solid rgba(101,165,26,.18); background: rgba(199,255,66,.18); color: #506f14; border-radius: 12px; padding: 10px 12px; font-size: 11px; font-weight: 700; line-height: 1.45; margin-bottom: 12px; }
+.auth-inline-success svg { flex: 0 0 auto; margin-top: 1px; }

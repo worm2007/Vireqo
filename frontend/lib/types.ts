@@ -16,6 +16,8 @@ export type User = {
   email: string;
   role: "owner" | "admin" | "member";
   is_active: boolean;
+  email_verified_at?: string | null;
+  is_email_verified: boolean;
   created_at: string;
   business: Business;
 };
@@ -28,6 +30,8 @@ export type AuthSession = {
   token_type: "bearer";
   expires_in: number;
   user: User;
+  email_verification_token?: string | null;
+  email_verification_url?: string | null;
 };
 
 export type Lead = {
@@ -404,6 +408,12 @@ export type ForgotPasswordResult = {
   message: string;
   reset_token?: string | null;
   reset_url?: string | null;
+};
+
+export type EmailVerificationResult = {
+  message: string;
+  verification_token?: string | null;
+  verification_url?: string | null;
 };
 export type AuditLog = {
   id: string;

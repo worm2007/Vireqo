@@ -54,9 +54,14 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(40), default="owner")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     business: Mapped[Business] = relationship(back_populates="users")
+
+    @property
+    def is_email_verified(self) -> bool:
+        return self.email_verified_at is not None
 
 
 class AuthToken(Base):
